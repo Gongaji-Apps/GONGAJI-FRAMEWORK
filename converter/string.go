@@ -11,7 +11,7 @@ func StringToInt(value string) (*int, error) {
 	result, err := strconv.Atoi(value)
 
 	if err != nil {
-		return nil, fmt.Errorf("[Internal Server Error] Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
+		return nil, fmt.Errorf("[Internal Server Error]1 Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
 	}
 
 	return &result, nil
