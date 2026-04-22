@@ -1,0 +1,16 @@
+package validator
+
+var messagesEN = map[string]string{
+	"required":        "{field} is required",
+	"notblank":        "{field} cannot be blank",
+	"email":           "{field} must be a valid email",
+	"min":             "{field} must be at least {param}",
+	"max":             "{field} must be at most {param}",
+	"len":             "{field} must be {param} characters",
+	"numeric":         "{field} must be a number",
+	"uuid":            "{field} must be a valid UUID",
+	"url":             "{field} must be a valid URL",
+	"oneof":           "{field} must be one of the allowed values",
+	"gte":             "{field} must be ≥ {param}",
+	"lte":             "{field} must be ≤ {param}",
+}
