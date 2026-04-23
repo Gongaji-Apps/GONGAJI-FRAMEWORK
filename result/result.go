@@ -1,6 +1,6 @@
 package result
 
-import "github.com/Gongaji-Apps/GONGAJI-COMMON/pagination"
+import "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/pagination"
 
 type Object_Result[T any] struct {
 	Data *T `json:"data"`

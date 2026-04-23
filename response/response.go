@@ -1,6 +1,6 @@
 package response
 
-import "github.com/Gongaji-Apps/GONGAJI-COMMON/pagination"
+import "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/pagination"
 
 type Meta struct {
 	Code    int    `json:"code"`

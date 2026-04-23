@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Gongaji-Apps/GONGAJI-COMMON/converter"
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/converter"
 )
 
 func TestStringToInt(t *testing.T) {

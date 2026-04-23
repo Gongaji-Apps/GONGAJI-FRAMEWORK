@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/Gongaji-Apps/GONGAJI-COMMON/contextx"
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
 	"github.com/sirupsen/logrus"
 )
 

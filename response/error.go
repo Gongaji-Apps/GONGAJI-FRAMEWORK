@@ -3,20 +3,20 @@ package response
 import (
 	"net/http"
 
-	commonErr "github.com/Gongaji-Apps/GONGAJI-COMMON/errors"
+	frameworkErr "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 )
 
 func mapHTTPStatus(err error) int {
 	switch err {
-	case commonErr.ErrBadRequest:
+	case frameworkErr.ErrBadRequest:
 		return http.StatusBadRequest
-	case commonErr.ErrUnauthorized:
+	case frameworkErr.ErrUnauthorized:
 		return http.StatusUnauthorized
-	case commonErr.ErrForbidden:
+	case frameworkErr.ErrForbidden:
 		return http.StatusForbidden
-	case commonErr.ErrNotFound:
+	case frameworkErr.ErrNotFound:
 		return http.StatusNotFound
-	case commonErr.ErrConflict:
+	case frameworkErr.ErrConflict:
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError

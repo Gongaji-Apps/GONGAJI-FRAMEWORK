@@ -3,7 +3,7 @@ package response
 import (
 	"github.com/gin-gonic/gin"
 
-	commonErr "github.com/Gongaji-Apps/GONGAJI-COMMON/errors"
+	frameworkErr "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 )
 
 func Success(ctx *gin.Context, data interface{}) {
@@ -19,7 +19,7 @@ func Success(ctx *gin.Context, data interface{}) {
 func Error(ctx *gin.Context, err error) {
 	status := mapHTTPStatus(err)
 
-	appErr, ok := err.(*commonErr.AppError)
+	appErr, ok := err.(*frameworkErr.AppError)
 	message := "Internal server error"
 
 	if ok {

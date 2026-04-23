@@ -1,4 +1,4 @@
-module github.com/Gongaji-Apps/GONGAJI-COMMON
+module github.com/Gongaji-Apps/GONGAJI-FRAMEWORK
 
 go 1.25.0
 
