@@ -1,24 +1,29 @@
 package logger
 
 import (
-	"log"
+	"context"
 	"os"
+
+	"github.com/Gongaji-Apps/GONGAJI-COMMON/contextx"
+	"github.com/sirupsen/logrus"
 )
 
 type Logger struct {
-	*log.Logger
+	*logrus.Logger
 }
 
 func New() *Logger {
-	return &Logger{
-		Logger: log.New(os.Stdout, "", log.LstdFlags),
-	}
+	log := logrus.New()
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&logrus.JSONFormatter{})
+	log.SetLevel(logrus.InfoLevel)
+
+	return &Logger{log}
 }
 
-func (l *Logger) Info(msg string) {
-	l.Println(`{"level":"INFO","message":"` + msg + `"}`)
-}
-
-func (l *Logger) Error(msg string) {
-	l.Println(`{"level":"ERROR","message":"` + msg + `"}`)
+func (l *Logger) WithCtx(ctx context.Context) *logrus.Entry {
+	return l.WithFields(logrus.Fields{
+		"request_id":     contextx.GetRequestID(ctx),
+		"correlation_id": contextx.GetCorrelationID(ctx),
+	})
 }
