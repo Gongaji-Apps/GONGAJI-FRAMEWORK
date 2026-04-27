@@ -3,22 +3,50 @@ package response
 import (
 	"net/http"
 
-	frameworkErr "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
+	"github.com/gin-gonic/gin"
 )
 
-func mapHTTPStatus(err error) int {
-	switch err {
-	case frameworkErr.ErrBadRequest:
-		return http.StatusBadRequest
-	case frameworkErr.ErrUnauthorized:
-		return http.StatusUnauthorized
-	case frameworkErr.ErrForbidden:
-		return http.StatusForbidden
-	case frameworkErr.ErrNotFound:
-		return http.StatusNotFound
-	case frameworkErr.ErrConflict:
-		return http.StatusConflict
-	default:
-		return http.StatusInternalServerError
+func httpStatus(err error) int {
+	if appErr, ok := err.(*errors.AppError); ok {
+		switch appErr.Code {
+		case errors.NotFound:
+			return http.StatusNotFound
+		case errors.Conflict:
+			return http.StatusConflict
+		case errors.Unauthorized:
+			return http.StatusUnauthorized
+		case errors.Forbidden:
+			return http.StatusForbidden
+		case errors.BadRequest:
+			return http.StatusBadRequest
+		default:
+			return http.StatusInternalServerError
+		}
 	}
+
+	return http.StatusInternalServerError
+}
+
+func Error(ctx *gin.Context, err error) {
+	status_code := httpStatus(err)
+
+	message := "[Internal Server Error] Afwan, terjadi kesalahan pada sistem."
+	var meta any
+
+	if appErr, ok := err.(*errors.AppError); ok {
+		message = appErr.Message
+		meta = appErr.Meta
+	}
+
+	Send(
+		ctx,
+		status_code,
+		false,
+		message,
+		nil,
+		nil,
+		nil,
+		meta,
+	)
 }

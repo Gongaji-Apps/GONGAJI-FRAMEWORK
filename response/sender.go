@@ -1,35 +1,29 @@
 package response
 
 import (
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/pagination"
 	"github.com/gin-gonic/gin"
-
-	frameworkErr "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 )
 
-func Success(ctx *gin.Context, data interface{}) {
-	ctx.JSON(200, Response{
-		Meta: Meta{
-			Code:    200,
-			Message: "success",
-		},
-		Data: data,
-	})
-}
-
-func Error(ctx *gin.Context, err error) {
-	status := mapHTTPStatus(err)
-
-	appErr, ok := err.(*frameworkErr.AppError)
-	message := "Internal server error"
-
-	if ok {
-		message = appErr.Message
+func Send(
+	ctx *gin.Context,
+	status_code int,
+	status bool,
+	message string,
+	data any,
+	data_total *int64,
+	pagination *pagination.Meta,
+	meta any,
+) {
+	response := Response{
+		Status_Code: status_code,
+		Status:      status,
+		Message:     message,
+		Data:        data,
+		Data_Total:  data_total,
+		Pagination:  pagination,
+		Meta:        meta,
 	}
 
-	ctx.JSON(status, Response{
-		Meta: Meta{
-			Code:    status,
-			Message: message,
-		},
-	})
+	ctx.JSON(response.Status_Code, response)
 }
