@@ -101,8 +101,6 @@ func normalizePagination(p query.Pagination) query.Pagination {
 // ==================== BASE APPLY PAGINATION ====================
 // ===============================================================
 func (r *Base_Repository[T]) applyPagination(qb *gorm.DB, p query.Pagination) *gorm.DB {
-	p = normalizePagination(p)
-
 	return qb.Limit(p.Limit).Offset((p.Pagination - 1) * p.Limit)
 }
 
@@ -146,6 +144,8 @@ func (r *Base_Repository[T]) Base_Get_Array(
 		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.Table_Name))
 	}
 
+	p = normalizePagination(p)
+	
 	qb = r.applyPagination(qb, p)
 
 	if err := qb.Find(&data).Error; err != nil {

@@ -36,7 +36,7 @@ func (g *GCS) Upload(ctx context.Context, r io.Reader, path string, contentType 
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s", g.cfg.BaseURL, path), nil
+	return fmt.Sprintf("%s/%s/%s", g.cfg.BaseURL, g.cfg.Bucket, path), nil
 }
 
 func (g *GCS) Delete(ctx context.Context, path string) error {
