@@ -162,7 +162,7 @@ func (r *Base_Repository[T]) Base_Get_Array(
 	}
 
 	p = normalizePagination(p)
-
+	
 	qb = r.applyPagination(qb, p)
 
 	if err := qb.Find(&data).Error; err != nil {

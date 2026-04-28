@@ -15,4 +15,5 @@ var messagesID = map[string]string{
 	// Customize
 	"notblank": "{field} tidak boleh hanya spasi",
 	"min_int":  "{field} harus ≥ {param}",
+	"max_int":  "{field} harus ≤ {param}",
 }
