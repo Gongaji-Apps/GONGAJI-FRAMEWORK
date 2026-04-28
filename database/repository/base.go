@@ -112,7 +112,24 @@ func (r *Base_Repository[T]) Base_Build_Query(
 	q query.Query,
 	custom func(*gorm.DB) *gorm.DB,
 ) *gorm.DB {
-	qb := r.db(ctx, nil).Model(new(T))
+	return r.Base_Build_Query_From(ctx, nil, q, custom)
+}
+
+// =================================================================
+// ==================== BASE BUILD QUERY FROM ======================
+// =================================================================
+// Base_Build_Query_From is identical to Base_Build_Query but starts
+// from the provided base *gorm.DB instead of the stored connection.
+// Pass nil to fall back to the default behavior.
+// Use this in GORM preload callbacks to preserve the foreign-key
+// WHERE constraint injected by GORM via the db1 parameter.
+func (r *Base_Repository[T]) Base_Build_Query_From(
+	ctx context.Context,
+	base *gorm.DB,
+	q query.Query,
+	custom func(*gorm.DB) *gorm.DB,
+) *gorm.DB {
+	qb := r.db(ctx, base).Model(new(T))
 
 	qb = r.applyHavings(qb, q)
 
@@ -145,7 +162,7 @@ func (r *Base_Repository[T]) Base_Get_Array(
 	}
 
 	p = normalizePagination(p)
-	
+
 	qb = r.applyPagination(qb, p)
 
 	if err := qb.Find(&data).Error; err != nil {
