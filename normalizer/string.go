@@ -24,3 +24,7 @@ func TrimAndNil(s *string) *string {
 
 	return &str
 }
+
+func UpperTrim(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
