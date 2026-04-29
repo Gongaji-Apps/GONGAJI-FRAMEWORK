@@ -1,10 +1,10 @@
 package query
 
 type Query struct {
-	Select      string
-	Update_Data any
-	Havings     []string
-	Where       any
-	Wheres      []Where
-	Order       string
+	Select     string
+	UpdateData any
+	Havings    []string
+	Where      any
+	Wheres     []Where
+	Order      string
 }

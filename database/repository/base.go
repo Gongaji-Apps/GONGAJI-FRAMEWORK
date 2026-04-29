@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	frameworkError "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 
@@ -17,24 +18,32 @@ import (
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/result"
 )
 
-type Base_Repository[T any] struct {
-	DB         *gorm.DB
-	Table_Name string
-	Debug      bool
+type BaseRepository[T any] struct {
+	DB        *gorm.DB
+	TableName string
+	Debug     bool
 }
 
-func New_Base_Repository[T any](db *gorm.DB, table string) Base_Repository[T] {
-	return Base_Repository[T]{
-		DB:         db,
-		Table_Name: table,
-		Debug:      strings.ToLower(os.Getenv("APP_DEBUG")) == "TRUE",
+// Deprecated: use BaseRepository instead.
+type Base_Repository[T any] = BaseRepository[T]
+
+func NewBaseRepository[T any](db *gorm.DB, table string) BaseRepository[T] {
+	return BaseRepository[T]{
+		DB:        db,
+		TableName: table,
+		Debug:     strings.EqualFold(os.Getenv("APP_DEBUG"), "true"),
 	}
+}
+
+// Deprecated: use NewBaseRepository instead.
+func New_Base_Repository[T any](db *gorm.DB, table string) BaseRepository[T] {
+	return NewBaseRepository[T](db, table)
 }
 
 // ========================================================
 // ==================== BASE GET QUERY ====================
 // ========================================================
-func (r *Base_Repository[T]) db(ctx context.Context, tx *gorm.DB) *gorm.DB {
+func (r *BaseRepository[T]) db(ctx context.Context, tx *gorm.DB) *gorm.DB {
 	if tx == nil {
 		tx = r.DB
 	}
@@ -51,7 +60,7 @@ func (r *Base_Repository[T]) db(ctx context.Context, tx *gorm.DB) *gorm.DB {
 // ===========================================================
 // ==================== BASE APPLY WHERES ====================
 // ===========================================================
-func (r *Base_Repository[T]) applyWheres(qb *gorm.DB, q query.Query) *gorm.DB {
+func (r *BaseRepository[T]) applyWheres(qb *gorm.DB, q query.Query) *gorm.DB {
 	if q.Where != nil {
 		qb = qb.Where(q.Where)
 	}
@@ -70,7 +79,7 @@ func (r *Base_Repository[T]) applyWheres(qb *gorm.DB, q query.Query) *gorm.DB {
 // ============================================================
 // ==================== BASE APPLY HAVINGS ====================
 // ============================================================
-func (r *Base_Repository[T]) applyHavings(qb *gorm.DB, q query.Query) *gorm.DB {
+func (r *BaseRepository[T]) applyHavings(qb *gorm.DB, q query.Query) *gorm.DB {
 	for _, h := range q.Havings {
 		qb = qb.Having(h)
 	}
@@ -100,30 +109,39 @@ func normalizePagination(p query.Pagination) query.Pagination {
 // ===============================================================
 // ==================== BASE APPLY PAGINATION ====================
 // ===============================================================
-func (r *Base_Repository[T]) applyPagination(qb *gorm.DB, p query.Pagination) *gorm.DB {
+func (r *BaseRepository[T]) applyPagination(qb *gorm.DB, p query.Pagination) *gorm.DB {
 	return qb.Limit(p.Limit).Offset((p.Pagination - 1) * p.Limit)
 }
 
 // ==========================================================
 // ==================== BASE BUILD QUERY ====================
 // ==========================================================
-func (r *Base_Repository[T]) Base_Build_Query(
+func (r *BaseRepository[T]) BaseBuildQuery(
 	ctx context.Context,
 	q query.Query,
 	custom func(*gorm.DB) *gorm.DB,
 ) *gorm.DB {
-	return r.Base_Build_Query_From(ctx, nil, q, custom)
+	return r.BaseBuildQueryFrom(ctx, nil, q, custom)
+}
+
+// Deprecated: use BaseBuildQuery instead.
+func (r *BaseRepository[T]) Base_Build_Query(
+	ctx context.Context,
+	q query.Query,
+	custom func(*gorm.DB) *gorm.DB,
+) *gorm.DB {
+	return r.BaseBuildQuery(ctx, q, custom)
 }
 
 // =================================================================
 // ==================== BASE BUILD QUERY FROM ======================
 // =================================================================
-// Base_Build_Query_From is identical to Base_Build_Query but starts
+// BaseBuildQueryFrom is identical to BaseBuildQuery but starts
 // from the provided base *gorm.DB instead of the stored connection.
 // Pass nil to fall back to the default behavior.
 // Use this in GORM preload callbacks to preserve the foreign-key
 // WHERE constraint injected by GORM via the db1 parameter.
-func (r *Base_Repository[T]) Base_Build_Query_From(
+func (r *BaseRepository[T]) BaseBuildQueryFrom(
 	ctx context.Context,
 	base *gorm.DB,
 	q query.Query,
@@ -146,47 +164,66 @@ func (r *Base_Repository[T]) Base_Build_Query_From(
 	return qb
 }
 
+// Deprecated: use BaseBuildQueryFrom instead.
+func (r *BaseRepository[T]) Base_Build_Query_From(
+	ctx context.Context,
+	base *gorm.DB,
+	q query.Query,
+	custom func(*gorm.DB) *gorm.DB,
+) *gorm.DB {
+	return r.BaseBuildQueryFrom(ctx, base, q, custom)
+}
+
 // ========================================================
 // ==================== BASE GET ARRAY ====================
 // ========================================================
-func (r *Base_Repository[T]) Base_Get_Array(
+func (r *BaseRepository[T]) BaseGetArray(
 	ctx context.Context,
 	qb *gorm.DB,
 	p query.Pagination,
-) (*result.Array_Result[T], error) {
+) (*result.ArrayResult[T], error) {
 	var data []T
 	var total int64
 
 	if err := qb.Count(&total).Error; err != nil {
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.Table_Name))
+		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
 	}
 
 	p = normalizePagination(p)
-	
+
 	qb = r.applyPagination(qb, p)
 
 	if err := qb.Find(&data).Error; err != nil {
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.Table_Name))
+		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
 	}
 
 	totalPage := int(math.Ceil(float64(total) / float64(p.Limit)))
 
-	return &result.Array_Result[T]{
+	return &result.ArrayResult[T]{
 		Data:       data,
-		Data_Total: total,
+		DataTotal:  total,
 		Pagination: pagination.New(p.Pagination, totalPage),
 	}, nil
+}
+
+// Deprecated: use BaseGetArray instead.
+func (r *BaseRepository[T]) Base_Get_Array(
+	ctx context.Context,
+	qb *gorm.DB,
+	p query.Pagination,
+) (*result.ArrayResult[T], error) {
+	return r.BaseGetArray(ctx, qb, p)
 }
 
 // =========================================================
 // ==================== BASE GET OBJECT ====================
 // =========================================================
-func (r *Base_Repository[T]) Base_Get_Object(
+func (r *BaseRepository[T]) BaseGetObject(
 	ctx context.Context,
 	qb *gorm.DB,
 	mode string,
 	notFoundError bool,
-) (*result.Object_Result[T], error) {
+) (*result.ObjectResult[T], error) {
 
 	var data T
 	var err error
@@ -201,60 +238,157 @@ func (r *Base_Repository[T]) Base_Get_Object(
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			if notFoundError {
-				return nil, frameworkError.NewNotFound(fmt.Sprintf("Afwan, Data %s tidak ditemukan.", r.Table_Name))
+				return nil, frameworkError.NewNotFound(fmt.Sprintf("Afwan, Data %s tidak ditemukan.", r.TableName))
 			}
 
-			return &result.Object_Result[T]{}, nil
+			return &result.ObjectResult[T]{}, nil
 		}
 
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.Table_Name))
+		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
 	}
 
-	return &result.Object_Result[T]{Data: &data}, nil
+	return &result.ObjectResult[T]{Data: &data}, nil
+}
+
+// Deprecated: use BaseGetObject instead.
+func (r *BaseRepository[T]) Base_Get_Object(
+	ctx context.Context,
+	qb *gorm.DB,
+	mode string,
+	notFoundError bool,
+) (*result.ObjectResult[T], error) {
+	return r.BaseGetObject(ctx, qb, mode, notFoundError)
+}
+
+// =====================================================
+// ==================== BASE EXISTS ====================
+// =====================================================
+func (r *BaseRepository[T]) BaseExists(ctx context.Context, qb *gorm.DB) (bool, error) {
+	var count int64
+	if err := qb.Count(&count).Error; err != nil {
+		return false, frameworkError.NewInternalServerError(
+			fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mengecek Data %s", r.TableName),
+		)
+	}
+	return count > 0, nil
+}
+
+// ====================================================
+// ==================== BASE COUNT ====================
+// ====================================================
+func (r *BaseRepository[T]) BaseCount(ctx context.Context, qb *gorm.DB) (int64, error) {
+	var count int64
+	if err := qb.Count(&count).Error; err != nil {
+		return 0, frameworkError.NewInternalServerError(
+			fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat menghitung Data %s", r.TableName),
+		)
+	}
+	return count, nil
 }
 
 // =====================================================
 // ==================== BASE CREATE ====================
 // =====================================================
-func (r *Base_Repository[T]) Base_Create(ctx context.Context, tx *gorm.DB, newData T) error {
+func (r *BaseRepository[T]) BaseCreate(ctx context.Context, tx *gorm.DB, newData T) error {
 	qb := r.db(ctx, tx)
 
-	// Create
 	if err := qb.Create(&newData).Error; err != nil {
-		return frameworkError.NormalizeDBError(err, r.Table_Name)
+		return frameworkError.NormalizeDBError(err, r.TableName)
 	}
 
+	return nil
+}
+
+// Deprecated: use BaseCreate instead.
+func (r *BaseRepository[T]) Base_Create(ctx context.Context, tx *gorm.DB, newData T) error {
+	return r.BaseCreate(ctx, tx, newData)
+}
+
+// ===========================================================
+// ==================== BASE CREATE BATCH ====================
+// ===========================================================
+func (r *BaseRepository[T]) BaseCreateBatch(ctx context.Context, tx *gorm.DB, data []T) error {
+	if len(data) == 0 {
+		return nil
+	}
+	qb := r.db(ctx, tx)
+	if err := qb.Create(&data).Error; err != nil {
+		return frameworkError.NormalizeDBError(err, r.TableName)
+	}
+	return nil
+}
+
+// =====================================================
+// ==================== BASE UPSERT ====================
+// =====================================================
+func (r *BaseRepository[T]) BaseUpsert(
+	ctx context.Context,
+	tx *gorm.DB,
+	data T,
+	conflictColumns []string,
+	updateColumns []string,
+) error {
+	qb := r.db(ctx, tx)
+
+	cols := make([]clause.Column, 0, len(conflictColumns))
+	for _, c := range conflictColumns {
+		cols = append(cols, clause.Column{Name: c})
+	}
+
+	onConflict := clause.OnConflict{Columns: cols}
+	if len(updateColumns) > 0 {
+		onConflict.DoUpdates = clause.AssignmentColumns(updateColumns)
+	} else {
+		onConflict.UpdateAll = true
+	}
+
+	if err := qb.Clauses(onConflict).Create(&data).Error; err != nil {
+		return frameworkError.NormalizeDBError(err, r.TableName)
+	}
 	return nil
 }
 
 // =====================================================
 // ==================== BASE UPDATE ====================
 // =====================================================
-func (r *Base_Repository[T]) Base_Update(ctx context.Context, tx *gorm.DB, v_query query.Query) error {
+func (r *BaseRepository[T]) BaseUpdate(ctx context.Context, tx *gorm.DB, q query.Query) error {
 	qb := r.db(ctx, tx).Model(new(T))
 
-	// Apply Wheres
-	qb = r.applyWheres(qb, v_query)
+	qb = r.applyWheres(qb, q)
 
-	// Update
-	if err := qb.Updates(v_query.Update_Data).Error; err != nil {
-		return frameworkError.NormalizeDBError(err, r.Table_Name)
+	if err := qb.Updates(q.UpdateData).Error; err != nil {
+		return frameworkError.NormalizeDBError(err, r.TableName)
 	}
 	return nil
+}
+
+// Deprecated: use BaseUpdate instead.
+func (r *BaseRepository[T]) Base_Update(ctx context.Context, tx *gorm.DB, q query.Query) error {
+	return r.BaseUpdate(ctx, tx, q)
 }
 
 // =====================================================
 // ==================== BASE DELETE ====================
 // =====================================================
-func (r *Base_Repository[T]) Base_Delete(ctx context.Context, tx *gorm.DB, v_query query.Query) error {
+func (r *BaseRepository[T]) BaseDelete(ctx context.Context, tx *gorm.DB, q query.Query) error {
 	qb := r.db(ctx, tx)
 
-	// Apply Wheres
-	qb = r.applyWheres(qb, v_query)
+	qb = r.applyWheres(qb, q)
 
-	// Delete
 	if err := qb.Delete(new(T)).Error; err != nil {
-		return frameworkError.NormalizeDBError(err, r.Table_Name)
+		return frameworkError.NormalizeDBError(err, r.TableName)
 	}
 	return nil
+}
+
+// Deprecated: use BaseDelete instead.
+func (r *BaseRepository[T]) Base_Delete(ctx context.Context, tx *gorm.DB, q query.Query) error {
+	return r.BaseDelete(ctx, tx, q)
+}
+
+// ==========================================================
+// ==================== BASE TRANSACTION ====================
+// ==========================================================
+func (r *BaseRepository[T]) BaseTransaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
+	return r.DB.WithContext(ctx).Transaction(fn)
 }

@@ -20,6 +20,12 @@ func httpStatus(err error) int {
 			return http.StatusForbidden
 		case errors.BadRequest:
 			return http.StatusBadRequest
+		case errors.PaymentRequired:
+			return http.StatusPaymentRequired
+		case errors.ServiceUnavailable:
+			return http.StatusServiceUnavailable
+		case errors.InternalServerError:
+			return http.StatusInternalServerError
 		default:
 			return http.StatusInternalServerError
 		}
@@ -29,7 +35,7 @@ func httpStatus(err error) int {
 }
 
 func Error(ctx *gin.Context, err error) {
-	status_code := httpStatus(err)
+	statusCode := httpStatus(err)
 
 	message := "[Internal Server Error] Afwan, terjadi kesalahan pada sistem."
 	var meta any
@@ -41,7 +47,7 @@ func Error(ctx *gin.Context, err error) {
 
 	Send(
 		ctx,
-		status_code,
+		statusCode,
 		false,
 		message,
 		nil,

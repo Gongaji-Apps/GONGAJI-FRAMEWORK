@@ -34,6 +34,8 @@ func JSON[T any](ctx *gin.Context) (T, error) {
 		return payload, bindError(ctx, err)
 	}
 
+	normalizer.NormalizeStruct(&payload)
+
 	return payload, nil
 }
 
@@ -48,6 +50,8 @@ func Query[T any](ctx *gin.Context) (T, error) {
 		return payload, bindError(ctx, err)
 	}
 
+	normalizer.NormalizeStruct(&payload)
+
 	return payload, nil
 }
 
@@ -61,6 +65,8 @@ func URI[T any](ctx *gin.Context) (T, error) {
 	if err := ctx.ShouldBindUri(&payload); err != nil {
 		return payload, bindError(ctx, err)
 	}
+
+	normalizer.NormalizeStruct(&payload)
 
 	return payload, nil
 }

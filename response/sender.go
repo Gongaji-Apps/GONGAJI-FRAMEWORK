@@ -7,23 +7,23 @@ import (
 
 func Send(
 	ctx *gin.Context,
-	status_code int,
+	statusCode int,
 	status bool,
 	message string,
 	data any,
-	data_total *int64,
+	dataTotal *int64,
 	pagination *pagination.Meta,
 	meta any,
 ) {
 	response := Response{
-		Status_Code: status_code,
-		Status:      status,
-		Message:     message,
-		Data:        data,
-		Data_Total:  data_total,
-		Pagination:  pagination,
-		Meta:        meta,
+		StatusCode: statusCode,
+		Status:     status,
+		Message:    message,
+		Data:       data,
+		DataTotal:  dataTotal,
+		Pagination: pagination,
+		Meta:       meta,
 	}
 
-	ctx.JSON(response.Status_Code, response)
+	ctx.JSON(response.StatusCode, response)
 }

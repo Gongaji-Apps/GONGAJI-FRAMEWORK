@@ -2,10 +2,7 @@ package formatter
 
 import "strings"
 
-// =======================================================
-// ==================== GENERATE SLUG ====================
-// =======================================================
-func Generate_Slug(value string) string {
+func GenerateSlug(value string) string {
 	var b strings.Builder
 	prevDash := false
 
@@ -23,4 +20,9 @@ func Generate_Slug(value string) string {
 	}
 
 	return strings.TrimRight(b.String(), "-")
+}
+
+// Deprecated: use GenerateSlug instead.
+func Generate_Slug(value string) string {
+	return GenerateSlug(value)
 }

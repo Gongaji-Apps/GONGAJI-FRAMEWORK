@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -56,21 +57,16 @@ func (g *GCS) SignedURL(path string, expire time.Duration) (string, error) {
 }
 
 func (g *GCS) DeleteBatch(ctx context.Context, paths []string) error {
-	ch := make(chan error, len(paths))
+	eg, ctx := errgroup.WithContext(ctx)
 
 	for _, p := range paths {
-		go func(path string) {
-			ch <- g.Delete(ctx, path)
-		}(p)
+		path := p
+		eg.Go(func() error {
+			return g.Delete(ctx, path)
+		})
 	}
 
-	for i := 0; i < len(paths); i++ {
-		if err := <-ch; err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return eg.Wait()
 }
 
 func (g *GCS) DeleteFolder(ctx context.Context, prefix string) error {
@@ -114,4 +110,19 @@ func (g *GCS) Move(ctx context.Context, src, dst string) error {
 	}
 
 	return g.Delete(ctx, src)
+}
+
+func (g *GCS) Exists(ctx context.Context, path string) (bool, error) {
+	_, err := g.client.Bucket(g.cfg.Bucket).Object(path).Attrs(ctx)
+	if err == storage.ErrObjectNotExist {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (g *GCS) GetURL(path string) string {
+	return fmt.Sprintf("%s/%s/%s", g.cfg.BaseURL, g.cfg.Bucket, path)
 }

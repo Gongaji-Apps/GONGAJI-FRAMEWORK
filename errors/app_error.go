@@ -4,13 +4,13 @@ type Code string
 
 const (
 	BadRequest          Code = "BAD_REQUEST"           // 400
-	Unauthorized        Code = "Unauthorized"          // 401
-	PaymentRequired     Code = "PaymentRequired"       // 402
-	Forbidden           Code = "Forbidden"             // 403
+	Unauthorized        Code = "UNAUTHORIZED"          // 401
+	PaymentRequired     Code = "PAYMENT_REQUIRED"      // 402
+	Forbidden           Code = "FORBIDDEN"             // 403
 	NotFound            Code = "NOT_FOUND"             // 404
 	Conflict            Code = "CONFLICT"              // 409
 	InternalServerError Code = "INTERNAL_SERVER_ERROR" // 500
-	ServiceUnavailable  Code = "ServiceUnavailable"    // 503
+	ServiceUnavailable  Code = "SERVICE_UNAVAILABLE"   // 503
 )
 
 type AppError struct {
@@ -65,4 +65,12 @@ func NewUnauthorized(message string) *AppError {
 
 func NewValidationError(message string) *AppError {
 	return Wrap(BadRequest, message, nil)
+}
+
+func NewPaymentRequired(message string) *AppError {
+	return Wrap(PaymentRequired, message, nil)
+}
+
+func NewServiceUnavailable(message string) *AppError {
+	return Wrap(ServiceUnavailable, message, nil)
 }
