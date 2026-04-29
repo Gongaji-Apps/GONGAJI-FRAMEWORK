@@ -6,7 +6,7 @@ import "fmt"
 // ==================== NORMALIZER =========================
 // ========================================================
 
-func NormalizeDBError(err error, table_name string) error {
+func NormalizeDBError(err error, tableName string) error {
 	if err == nil {
 		return nil
 	}
@@ -21,6 +21,6 @@ func NormalizeDBError(err error, table_name string) error {
 	case IsCheckConstraintError(err):
 		return NewBadRequest("[Check Constraint]")
 	default:
-		return NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat menyimpan Data %s.", table_name))
+		return NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat menyimpan Data %s.", tableName))
 	}
 }

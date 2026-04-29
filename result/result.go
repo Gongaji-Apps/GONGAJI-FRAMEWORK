@@ -2,12 +2,18 @@ package result
 
 import "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/pagination"
 
-type Object_Result[T any] struct {
+type ObjectResult[T any] struct {
 	Data *T `json:"data"`
 }
 
-type Array_Result[T any] struct {
+type ArrayResult[T any] struct {
 	Data       []T             `json:"data"`
-	Data_Total int64           `json:"data_total"`
+	DataTotal  int64           `json:"data_total"`
 	Pagination pagination.Meta `json:"pagination"`
 }
+
+// Deprecated: use ObjectResult instead.
+type Object_Result[T any] = ObjectResult[T]
+
+// Deprecated: use ArrayResult instead.
+type Array_Result[T any] = ArrayResult[T]

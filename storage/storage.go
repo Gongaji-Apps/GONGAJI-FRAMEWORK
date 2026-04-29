@@ -14,4 +14,6 @@ type Storage interface {
 	Copy(ctx context.Context, src, dst string) error
 	Move(ctx context.Context, src, dst string) error
 	SignedURL(path string, expire time.Duration) (string, error)
+	Exists(ctx context.Context, path string) (bool, error)
+	GetURL(path string) string
 }
