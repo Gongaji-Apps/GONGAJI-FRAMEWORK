@@ -11,6 +11,8 @@ require (
 	gorm.io/driver/postgres v1.6.0
 )
 
+require github.com/robfig/cron/v3 v3.0.1
+
 require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
