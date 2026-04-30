@@ -10,8 +10,3 @@ func InitValidator() {
 		runRegistrations(v)
 	}
 }
-
-// Deprecated: use InitValidator instead.
-func Init_Validator() {
-	InitValidator()
-}

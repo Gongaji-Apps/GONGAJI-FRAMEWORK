@@ -24,20 +24,12 @@ type BaseRepository[T any] struct {
 	Debug     bool
 }
 
-// Deprecated: use BaseRepository instead.
-type Base_Repository[T any] = BaseRepository[T]
-
 func NewBaseRepository[T any](db *gorm.DB, table string) BaseRepository[T] {
 	return BaseRepository[T]{
 		DB:        db,
 		TableName: table,
 		Debug:     strings.EqualFold(os.Getenv("APP_DEBUG"), "true"),
 	}
-}
-
-// Deprecated: use NewBaseRepository instead.
-func New_Base_Repository[T any](db *gorm.DB, table string) BaseRepository[T] {
-	return NewBaseRepository[T](db, table)
 }
 
 // ========================================================
@@ -124,15 +116,6 @@ func (r *BaseRepository[T]) BaseBuildQuery(
 	return r.BaseBuildQueryFrom(ctx, nil, q, custom)
 }
 
-// Deprecated: use BaseBuildQuery instead.
-func (r *BaseRepository[T]) Base_Build_Query(
-	ctx context.Context,
-	q query.Query,
-	custom func(*gorm.DB) *gorm.DB,
-) *gorm.DB {
-	return r.BaseBuildQuery(ctx, q, custom)
-}
-
 // =================================================================
 // ==================== BASE BUILD QUERY FROM ======================
 // =================================================================
@@ -162,16 +145,6 @@ func (r *BaseRepository[T]) BaseBuildQueryFrom(
 	}
 
 	return qb
-}
-
-// Deprecated: use BaseBuildQueryFrom instead.
-func (r *BaseRepository[T]) Base_Build_Query_From(
-	ctx context.Context,
-	base *gorm.DB,
-	q query.Query,
-	custom func(*gorm.DB) *gorm.DB,
-) *gorm.DB {
-	return r.BaseBuildQueryFrom(ctx, base, q, custom)
 }
 
 // ========================================================
@@ -204,15 +177,6 @@ func (r *BaseRepository[T]) BaseGetArray(
 		DataTotal:  total,
 		Pagination: pagination.New(p.Pagination, totalPage),
 	}, nil
-}
-
-// Deprecated: use BaseGetArray instead.
-func (r *BaseRepository[T]) Base_Get_Array(
-	ctx context.Context,
-	qb *gorm.DB,
-	p query.Pagination,
-) (*result.ArrayResult[T], error) {
-	return r.BaseGetArray(ctx, qb, p)
 }
 
 // =========================================================
@@ -248,16 +212,6 @@ func (r *BaseRepository[T]) BaseGetObject(
 	}
 
 	return &result.ObjectResult[T]{Data: &data}, nil
-}
-
-// Deprecated: use BaseGetObject instead.
-func (r *BaseRepository[T]) Base_Get_Object(
-	ctx context.Context,
-	qb *gorm.DB,
-	mode string,
-	notFoundError bool,
-) (*result.ObjectResult[T], error) {
-	return r.BaseGetObject(ctx, qb, mode, notFoundError)
 }
 
 // =====================================================
@@ -297,11 +251,6 @@ func (r *BaseRepository[T]) BaseCreate(ctx context.Context, tx *gorm.DB, newData
 	}
 
 	return nil
-}
-
-// Deprecated: use BaseCreate instead.
-func (r *BaseRepository[T]) Base_Create(ctx context.Context, tx *gorm.DB, newData T) error {
-	return r.BaseCreate(ctx, tx, newData)
 }
 
 // ===========================================================
@@ -362,11 +311,6 @@ func (r *BaseRepository[T]) BaseUpdate(ctx context.Context, tx *gorm.DB, q query
 	return nil
 }
 
-// Deprecated: use BaseUpdate instead.
-func (r *BaseRepository[T]) Base_Update(ctx context.Context, tx *gorm.DB, q query.Query) error {
-	return r.BaseUpdate(ctx, tx, q)
-}
-
 // =====================================================
 // ==================== BASE DELETE ====================
 // =====================================================
@@ -379,11 +323,6 @@ func (r *BaseRepository[T]) BaseDelete(ctx context.Context, tx *gorm.DB, q query
 		return frameworkError.NormalizeDBError(err, r.TableName)
 	}
 	return nil
-}
-
-// Deprecated: use BaseDelete instead.
-func (r *BaseRepository[T]) Base_Delete(ctx context.Context, tx *gorm.DB, q query.Query) error {
-	return r.BaseDelete(ctx, tx, q)
 }
 
 // ==========================================================
