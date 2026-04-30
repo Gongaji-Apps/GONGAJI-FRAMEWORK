@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/alicebob/miniredis/v2 v2.37.0
+	firebase.google.com/go/v4 v4.19.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/redis/go-redis/v9 v9.19.0
@@ -11,6 +12,18 @@ require (
 	go.opentelemetry.io/otel/sdk v1.43.0
 	golang.org/x/text v0.36.0
 	gorm.io/driver/postgres v1.6.0
+)
+
+require github.com/robfig/cron/v3 v3.0.1
+require cloud.google.com/go/cloudtasks v1.16.0
+
+require (
+	cloud.google.com/go/firestore v1.21.0 // indirect
+	cloud.google.com/go/longrunning v0.9.0 // indirect
+	github.com/MicahParks/keyfunc v1.9.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
+	google.golang.org/appengine/v2 v2.0.6 // indirect
 )
 
 require (
@@ -103,6 +116,6 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.11
 	gorm.io/gorm v1.31.1
 )
