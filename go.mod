@@ -12,6 +12,7 @@ require (
 	gorm.io/driver/postgres v1.6.0
 )
 
+require github.com/robfig/cron/v3 v3.0.1
 require cloud.google.com/go/cloudtasks v1.16.0
 
 require (
