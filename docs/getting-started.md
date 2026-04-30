@@ -455,49 +455,69 @@ func Register(r *gin.Engine, userHdl *user.Handler) {
 
 Framework menyediakan **strategy-based** auth middleware. Anda implementasikan satu atau lebih `AuthStrategy`, framework yang pilih strategy yang cocok per request.
 
-### Contoh: JWT strategy
+### Pakai JWT strategy bawaan
+
+Framework sudah menyediakan `authentication/jwt` package — jangan tulis JWT strategy sendiri:
 
 ```go
-// auth/jwt_strategy.go
+// auth/jwt_validator.go
 package auth
 
 import (
     "context"
-    "fmt"
 
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/jwt"
     "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
-    authutils "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/utils"
     "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
+    "github.com/Gongaji-Apps/api-demo/domain/user"
 )
 
-type JWTStrategy struct {
-    Secret string
-}
-
-func (s JWTStrategy) Name() string                        { return "JWT" }
-func (s JWTStrategy) CanHandle(c *gin.Context) bool       { return c.GetHeader("Authorization") != "" }
-func (s JWTStrategy) ExtractToken(c *gin.Context) (string, error) {
-    return authutils.ExtractBearer(c)
-}
-
-func (s JWTStrategy) Authenticate(ctx context.Context, raw string) (*middleware.AuthClaims, error) {
-    tok, err := jwt.Parse(raw, func(t *jwt.Token) (any, error) {
-        if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, fmt.Errorf("unexpected signing method")
-        }
-        return []byte(s.Secret), nil
+// NewJWTStrategy build strategy dengan Validator yang lakukan DB lookup.
+func NewJWTStrategy(secret string, repo *user.Repository) (*jwt.Strategy, error) {
+    mgr, err := jwt.New(jwt.Config{
+        Secret:     []byte(secret),
+        Issuer:     "api-demo",
+        DefaultTTL: 24 * time.Hour,
     })
-    if err != nil || !tok.Valid {
-        return nil, errors.NewUnauthorized("Token tidak valid.")
+    if err != nil {
+        return nil, err
     }
-    claims := tok.Claims.(jwt.MapClaims)
-    return &middleware.AuthClaims{
-        SubjectUUID: claims["sub"].(string),
-        Role:        claims["role"].(string),
-    }, nil
+
+    validator := func(ctx context.Context, c *jwt.Claims, raw string) (*middleware.AuthClaims, error) {
+        // App-level checks: DB lookup, single-device, active flag
+        res, err := repo.FindByUUID(ctx, c.SubjectUUID, true)
+        if err != nil {
+            return nil, err
+        }
+        u := res.Data
+        if !u.Active {
+            return nil, errors.NewUnauthorized("Akun Anda telah dinonaktifkan.")
+        }
+        // (Optional) single-device: bandingkan token tersimpan dengan raw
+        // if u.Token == nil || *u.Token != raw {
+        //     return nil, errors.NewUnauthorized("Token tidak valid.")
+        // }
+
+        return &middleware.AuthClaims{
+            SubjectUUID: u.UUID,
+            Role:        u.Role,
+            Extra:       map[string]any{"user_full_name": u.Name},
+        }, nil
+    }
+
+    return &jwt.Strategy{Manager: mgr, Validator: validator}, nil
 }
+```
+
+Untuk generate token (mis. di endpoint login):
+
+```go
+mgr, _ := jwt.New(jwt.Config{Secret: []byte(cfg.JWTSecret), DefaultTTL: 24 * time.Hour})
+token, err := mgr.Generate(jwt.Claims{
+    SubjectUUID: user.UUID,
+    Extra:       map[string]any{"role": user.Role},
+})
+// kirim token ke client
 ```
 
 ### Wire up
@@ -508,8 +528,8 @@ import (
     "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
 )
 
-func Register(r *gin.Engine, cfg config.Config, userHdl *user.Handler) {
-    authMW := middleware.Auth(auth.JWTStrategy{Secret: cfg.JWTSecret})
+func Register(r *gin.Engine, cfg config.Config, userHdl *user.Handler, jwtStrategy *jwt.Strategy) {
+    authMW := middleware.Auth(jwtStrategy)
 
     api := r.Group("/api/v1")
     {
@@ -517,6 +537,7 @@ func Register(r *gin.Engine, cfg config.Config, userHdl *user.Handler) {
         users.GET("",                                 userHdl.List)
         users.GET("/:uuid",                           userHdl.Get)
         users.POST("",   middleware.RequirePermission("USER_CREATE"), userHdl.Create)
+        users.DELETE("/:uuid", middleware.AuthorizeRoles("ADMIN"),    userHdl.Delete)
     }
 }
 ```

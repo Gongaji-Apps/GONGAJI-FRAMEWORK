@@ -35,6 +35,7 @@ Resep-resep konkret untuk task yang sering muncul di service GoNgaji. Tiap resep
 - [Migration dari pola lama (19 service existing)](#migration-dari-pola-lama-19-service-existing)
 - [Graceful shutdown](#graceful-shutdown)
 - [Multi-source auth (JWT + API key)](#multi-source-auth-jwt--api-key)
+- [JWT issue + verify token (login + refresh flow)](#jwt-issue--verify-token-login--refresh-flow)
 
 ---
 
@@ -836,21 +837,45 @@ func main() {
 
 ## Multi-source auth (JWT + API key)
 
-```go
-// strategies/jwt.go
-type JWTStrategy struct{ Secret string }
-func (s JWTStrategy) Name() string { return "JWT" }
-func (s JWTStrategy) CanHandle(c *gin.Context) bool {
-    return strings.HasPrefix(c.GetHeader("Authorization"), "Bearer ")
-}
-// ... ExtractToken, Authenticate
+JWT strategy pakai package bawaan; API key strategy tulis sendiri (custom karena tergantung schema DB Anda).
 
-// strategies/apikey.go
-type APIKeyStrategy struct{ Repo *APIKeyRepo }
-func (s APIKeyStrategy) Name() string { return "API_KEY" }
-func (s APIKeyStrategy) CanHandle(c *gin.Context) bool {
-    return c.GetHeader("X-Api-Key") != ""
+```go
+import (
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/jwt"
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
+    authutils "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/utils"
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
+)
+
+// 1) JWT strategy — pakai framework
+mgr, _ := jwt.New(jwt.Config{
+    Secret:     []byte(cfg.JWTSecret),
+    Issuer:     "gongaji-api",
+    DefaultTTL: 24 * time.Hour,
+})
+jwtStrategy := &jwt.Strategy{
+    Manager: mgr,
+    Validator: func(ctx context.Context, c *jwt.Claims, raw string) (*middleware.AuthClaims, error) {
+        // App-specific check: DB lookup, single-device, active
+        u, err := userRepo.FindByUUID(ctx, c.SubjectUUID, true)
+        if err != nil {
+            return nil, err
+        }
+        if !u.Data.Active {
+            return nil, errors.NewUnauthorized("Akun nonaktif.")
+        }
+        return &middleware.AuthClaims{
+            SubjectUUID: u.Data.UUID,
+            Role:        u.Data.Role,
+        }, nil
+    },
 }
+
+// 2) API key strategy — custom (tergantung schema)
+type APIKeyStrategy struct{ Repo *APIKeyRepo }
+
+func (s APIKeyStrategy) Name() string                  { return "API_KEY" }
+func (s APIKeyStrategy) CanHandle(c *gin.Context) bool { return c.GetHeader("X-Api-Key") != "" }
 func (s APIKeyStrategy) ExtractToken(c *gin.Context) (string, error) {
     return c.GetHeader("X-Api-Key"), nil
 }
@@ -861,17 +886,83 @@ func (s APIKeyStrategy) Authenticate(ctx context.Context, raw string) (*middlewa
         return nil, errors.NewUnauthorized("API key tidak valid.")
     }
     return &middleware.AuthClaims{
-        SubjectUUID: rec.OwnerUUID,
-        Role:        "API_CONSUMER",
+        SubjectUUID:     rec.OwnerUUID,
+        Role:            "API_CONSUMER",
         PermissionCodes: rec.Permissions,
     }, nil
 }
 
-// main
-authMW := middleware.Auth(
-    JWTStrategy{Secret: cfg.JWTSecret},
-    APIKeyStrategy{Repo: apiKeyRepo},
-)
+// 3) Wire
+authMW := middleware.Auth(jwtStrategy, APIKeyStrategy{Repo: apiKeyRepo})
+```
+
+Routing dengan campuran auth + role:
+
+```go
+api := r.Group("/api/v1", authMW)
+api.GET("/users",                                          userHdl.List)
+api.POST("/users",      middleware.RequirePermission("USER_CREATE"), userHdl.Create)
+api.DELETE("/users/:uuid", middleware.AuthorizeRoles("ADMIN"),       userHdl.Delete)
 ```
 
 `middleware.Auth` akan coba JWT dulu (kalau ada `Authorization: Bearer ...`), kalau tidak match coba API key (kalau ada `X-Api-Key: ...`). Kalau dua-dua tidak match → 401.
+
+> **Catatan**: dua strategy yang `CanHandle == true` di-coba berurutan, tapi kalau strategy pertama gagal `Authenticate` (mis. JWT signature invalid), framework **tidak** fallback ke strategy berikutnya — return error langsung. Kalau Anda butuh fallback semantic, pakai header berbeda per source (Bearer untuk JWT, X-Api-Key untuk API key) — yang sudah otomatis dengan example di atas.
+
+---
+
+## JWT issue + verify token (login + refresh flow)
+
+Endpoint login generate token, endpoint refresh validasi token lama dan generate baru.
+
+```go
+import "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/jwt"
+
+type AuthService struct {
+    jwt  *jwt.Manager
+    repo *user.Repository
+}
+
+func NewAuthService(secret string, repo *user.Repository) (*AuthService, error) {
+    mgr, err := jwt.New(jwt.Config{
+        Secret:     []byte(secret),
+        Issuer:     "gongaji-api",
+        DefaultTTL: 24 * time.Hour,
+    })
+    if err != nil {
+        return nil, err
+    }
+    return &AuthService{jwt: mgr, repo: repo}, nil
+}
+
+// Login: verify password, issue token
+func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+    u, err := s.repo.FindByEmail(ctx, email)
+    if err != nil {
+        return "", errors.NewUnauthorized("Email atau password salah.")
+    }
+    if !checkPassword(u.Data.PasswordHash, password) {
+        return "", errors.NewUnauthorized("Email atau password salah.")
+    }
+
+    return s.jwt.Generate(jwt.Claims{
+        SubjectUUID: u.Data.UUID,
+        Extra: map[string]any{
+            "role": u.Data.Role,
+        },
+    })
+}
+
+// Refresh: validasi token lama (boleh sudah expired), issue baru
+// Ini design biar simple — production sebaiknya pakai refresh token terpisah.
+func (s *AuthService) Refresh(ctx context.Context, oldToken string) (string, error) {
+    claims, err := s.jwt.Parse(oldToken)
+    if err != nil {
+        return "", errors.NewUnauthorized("Token tidak valid.")
+    }
+    return s.jwt.Generate(jwt.Claims{
+        SubjectUUID: claims.SubjectUUID,
+        Extra:       claims.Extra,
+    })
+}
+```

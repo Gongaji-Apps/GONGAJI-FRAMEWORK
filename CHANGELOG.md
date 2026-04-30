@@ -7,6 +7,27 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.5.0] — JWT package + AuthorizeRoles
+
+### Added
+
+- **`authentication/jwt/`** — JWT token generation + parsing + ready-to-use `AuthStrategy`. Mengganti pola `Auth_Middleware` + `Extract_Token` yang ada di setiap service:
+  - `jwt.New(Config)` — Manager (secret, issuer, default TTL)
+  - `jwt.Manager.Generate(Claims)` — sign HS256
+  - `jwt.Manager.Parse(token)` — verify signature + expiry + nbf + issuer; return `ErrInvalidToken` (wrappable) on failure
+  - `jwt.Strategy{Manager, Validator}` — implements `middleware.AuthStrategy`. `Validator` adalah hook untuk app-specific checks (DB lookup, single-device enforcement, active flag)
+  - `jwt.StrategyName` field untuk multi-signer (mis. internal vs partner JWT)
+  - Reserved claim names di `Claims.Extra` di-skip (cegah caller override `sub`/`exp`/dll. tidak sengaja)
+  - Algorithm whitelist HS256 only (cegah `alg: none` attack)
+
+- **`authentication/middleware.AuthorizeRoles(...string)`** — role-based authorization middleware. Match case-insensitive terhadap `role_code` di context. `AuthorizeRoles()` tanpa argumen = always reject (defensive).
+
+### Dependencies
+
+- New direct dep: `github.com/golang-jwt/jwt/v5 v5.3.1`.
+
+---
+
 ## [v0.4.0] — Cleanup deprecated aliases
 
 ### Removed (BREAKING)
@@ -122,6 +143,7 @@ Foundation packages:
 
 ---
 
+[v0.5.0]: https://github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/releases/tag/v0.5.0
 [v0.4.0]: https://github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/releases/tag/v0.4.0
 [v0.3.0]: https://github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/releases/tag/v0.3.0
 [v0.2.0]: https://github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/releases/tag/v0.2.0
