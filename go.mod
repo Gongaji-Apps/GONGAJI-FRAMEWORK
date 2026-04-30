@@ -11,6 +11,8 @@ require (
 	gorm.io/driver/postgres v1.6.0
 )
 
+require cloud.google.com/go/cloudtasks v1.16.0
+
 require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
@@ -96,6 +98,6 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.11
 	gorm.io/gorm v1.31.1
 )
