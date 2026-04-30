@@ -21,8 +21,3 @@ func GenerateSlug(value string) string {
 
 	return strings.TrimRight(b.String(), "-")
 }
-
-// Deprecated: use GenerateSlug instead.
-func Generate_Slug(value string) string {
-	return GenerateSlug(value)
-}
