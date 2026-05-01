@@ -25,7 +25,7 @@ go get github.com/Gongaji-Apps/GONGAJI-FRAMEWORK@latest
 Atau pin ke versi spesifik:
 
 ```bash
-go get github.com/Gongaji-Apps/GONGAJI-FRAMEWORK@v0.4.0
+go get github.com/Gongaji-Apps/GONGAJI-FRAMEWORK@v0.5.0
 ```
 
 Persyaratan:
@@ -129,7 +129,8 @@ Example response error:
 | [`database`](docs/packages.md#database) | Postgres connection helper | gorm + postgres driver |
 | [`database/repository`](docs/packages.md#databaserepository) | Generic `BaseRepository[T]` (CRUD + query + upsert + transaction) | gorm |
 | **Auth** | | |
-| [`authentication/middleware`](docs/packages.md#authenticationmiddleware) | Strategy-pattern auth middleware | gin |
+| [`authentication/middleware`](docs/packages.md#authenticationmiddleware) | Strategy-pattern auth + `RequirePermission` + `AuthorizeRoles` | gin |
+| [`authentication/jwt`](docs/packages.md#authenticationjwt) | JWT generate/parse + ready `AuthStrategy` dengan Validator hook | golang-jwt/jwt |
 | [`authentication/utils`](docs/packages.md#authenticationutils) | Bearer extractor, API key generator | — |
 | [`contextx`](docs/packages.md#contextx) | Typed context keys (request ID, subject UUID, role, dll.) | — |
 | **Integrasi pihak ketiga** | | |
@@ -170,6 +171,7 @@ Framework mengikuti **semantic versioning** dengan tag `vMAJOR.MINOR.PATCH`.
 
 | Version | Highlights |
 |---|---|
+| `v0.5.0` | Tambah `authentication/jwt` (Manager + Strategy + Validator hook) + `AuthorizeRoles` middleware |
 | `v0.4.0` | Hapus deprecated snake_case aliases dari v0.2.0 |
 | `v0.3.0` | Tambah `httputil`, `crypto/rsa`, `messaging/whatsapp`, `mailer`, `cloudtask`, `notification/fcm`, `scheduler`, `cache` |
 | `v0.2.0` | Naming convention overhaul (PascalCase + camelCase). Field renames bersifat breaking |
@@ -181,7 +183,7 @@ Karena masih `v0.x`, **breaking change boleh terjadi di minor version**. Setelah
 
 ```go
 // go.mod
-require github.com/Gongaji-Apps/GONGAJI-FRAMEWORK v0.4.0
+require github.com/Gongaji-Apps/GONGAJI-FRAMEWORK v0.5.0
 ```
 
 Jangan pakai `@latest` di production — selalu pin ke version eksplisit untuk reproducibility.

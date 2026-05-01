@@ -19,7 +19,7 @@ Pakai Ctrl+F untuk cari nama function/type yang Anda butuhkan.
 - [database](#database) · [database/repository](#databaserepository)
 
 **Auth:**
-- [authentication/middleware](#authenticationmiddleware) · [authentication/utils](#authenticationutils) · [contextx](#contextx)
+- [authentication/middleware](#authenticationmiddleware) · [authentication/jwt](#authenticationjwt) · [authentication/utils](#authenticationutils) · [contextx](#contextx)
 
 **Integrasi pihak ketiga:**
 - [httputil](#httputil) · [messaging/whatsapp](#messagingwhatsapp) · [mailer](#mailer) · [notification/fcm](#notificationfcm) · [cloudtask](#cloudtask) · [storage](#storage) · [storage/gcs](#storagegcs)
@@ -685,33 +685,39 @@ type AuthStrategy interface {
 |---|---|
 | `Auth(strategies ...AuthStrategy) gin.HandlerFunc` | Coba setiap strategy yang `CanHandle()`, autentikasi, set context |
 | `RequirePermission(code string) gin.HandlerFunc` | Reject 403 kalau tidak punya permission code |
+| `AuthorizeRoles(roles ...string) gin.HandlerFunc` | Reject 403 kalau `role_code` di context bukan salah satu dari roles (case-insensitive). Empty list = always reject (defensive) |
 
-### Implement strategy
+### Strategy bawaan: JWT
+
+Untuk JWT, **jangan tulis strategy sendiri** — pakai [`authentication/jwt`](#authenticationjwt) yang sudah ready (signature verify, expiry, issuer, optional Validator hook untuk DB lookup).
+
+### Implement strategy custom (mis. API key)
 
 ```go
-type JWTStrategy struct {
-    Secret string
+type APIKeyStrategy struct {
+    Repo *APIKeyRepo
 }
 
-func (s JWTStrategy) Name() string { return "JWT" }
+func (s APIKeyStrategy) Name() string { return "API_KEY" }
 
-func (s JWTStrategy) CanHandle(c *gin.Context) bool {
-    return strings.HasPrefix(c.GetHeader("Authorization"), "Bearer ")
+func (s APIKeyStrategy) CanHandle(c *gin.Context) bool {
+    return c.GetHeader("X-Api-Key") != ""
 }
 
-func (s JWTStrategy) ExtractToken(c *gin.Context) (string, error) {
-    return authutils.ExtractBearer(c)
+func (s APIKeyStrategy) ExtractToken(c *gin.Context) (string, error) {
+    return c.GetHeader("X-Api-Key"), nil
 }
 
-func (s JWTStrategy) Authenticate(ctx context.Context, raw string) (*middleware.AuthClaims, error) {
-    // ... parse + verify JWT
+func (s APIKeyStrategy) Authenticate(ctx context.Context, raw string) (*middleware.AuthClaims, error) {
+    hash := authutils.HashApiKey(raw)
+    rec, err := s.Repo.FindByHash(ctx, hash)
+    if err != nil {
+        return nil, errors.NewUnauthorized("API key tidak valid.")
+    }
     return &middleware.AuthClaims{
-        SubjectUUID: sub,
-        Role:        role,
-        PermissionCodes: map[string]bool{
-            "USER_CREATE": true,
-            "USER_DELETE": true,
-        },
+        SubjectUUID: rec.OwnerUUID,
+        Role:        "API_CONSUMER",
+        PermissionCodes: rec.Permissions,
     }, nil
 }
 ```
@@ -719,14 +725,23 @@ func (s JWTStrategy) Authenticate(ctx context.Context, raw string) (*middleware.
 ### Wire up
 
 ```go
+import (
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/jwt"
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
+)
+
+jwtMgr, _ := jwt.New(jwt.Config{Secret: []byte(cfg.JWTSecret)})
+jwtStrategy := &jwt.Strategy{Manager: jwtMgr, Validator: validateUser}
+
 authMW := middleware.Auth(
-    JWTStrategy{Secret: jwtSecret},
+    jwtStrategy,
     APIKeyStrategy{Repo: apiKeyRepo},  // fallback kalau tidak ada Authorization header
 )
 
 protected := r.Group("/api/v1", authMW)
-protected.GET("/users",         userHdl.List)
-protected.POST("/users",        middleware.RequirePermission("USER_CREATE"), userHdl.Create)
+protected.GET("/users",                                                       userHdl.List)
+protected.POST("/users",   middleware.RequirePermission("USER_CREATE"),       userHdl.Create)
+protected.DELETE("/users/:uuid", middleware.AuthorizeRoles("ADMIN"),          userHdl.Delete)
 ```
 
 ### Reading claims
@@ -745,6 +760,159 @@ func (h *Handler) Me(c *gin.Context) {
 - Strategy diuji **berurutan** di `Auth(...)`. Letakkan strategy yang paling spesifik di depan.
 - Kalau **tidak ada strategy** yang `CanHandle`, middleware return 401 `"Metode autentikasi tidak dikenali."`
 - `RequirePermission` baca dari `c.Get("permission_codes")` (di-set oleh `Auth`). Pasang `Auth` dulu, baru `RequirePermission`.
+- `AuthorizeRoles` baca dari `c.Get("role_code")`. Pasang `Auth` dulu, baru `AuthorizeRoles`. Match case-insensitive — `AuthorizeRoles("ADMIN")` cocok dengan `role_code` "admin", "Admin", "ADMIN".
+- `AuthorizeRoles()` **tanpa argumen** = always reject (defensive). Untuk endpoint yang harus open ke semua authenticated user, jangan pasang `AuthorizeRoles` sama sekali.
+
+---
+
+## authentication/jwt
+
+**Tujuan**: JWT token generation + parsing + ready-to-use `AuthStrategy`. Mengganti pola `Auth_Middleware` + `Extract_Token` yang ada di setiap service.
+
+### Manager
+
+```go
+type Config struct {
+    Secret     []byte         // required, HMAC key
+    Issuer     string         // optional, di-emit ke iss + di-validate saat Parse
+    DefaultTTL time.Duration  // optional, dipakai saat Claims.ExpiresAt zero
+}
+
+type Claims struct {
+    SubjectUUID string         // sub
+    IssuedAt    time.Time      // iat
+    ExpiresAt   time.Time      // exp
+    NotBefore   time.Time      // nbf, optional
+    Issuer      string         // iss, optional override per-call
+    Extra       map[string]any // custom payload
+}
+
+m, err := jwt.New(jwt.Config{
+    Secret:     []byte(os.Getenv("JWT_SECRET")),
+    Issuer:     "gongaji-api",
+    DefaultTTL: 24 * time.Hour,
+})
+```
+
+### Generate
+
+```go
+token, err := m.Generate(jwt.Claims{
+    SubjectUUID: user.UUID,
+    ExpiresAt:   time.Now().Add(24 * time.Hour),
+    Extra: map[string]any{
+        "role":     "ADMIN",
+        "tenant":   tenantID,
+    },
+})
+```
+
+Field reserved (`sub`, `exp`, `iat`, `nbf`, `iss`, `aud`, `jti`) di `Extra` di-skip — caller tidak bisa override standar claim secara tidak sengaja.
+
+### Parse
+
+```go
+claims, err := m.Parse(rawToken)
+if err != nil {
+    if errors.Is(err, jwt.ErrInvalidToken) {
+        return appErrors.NewUnauthorized("Token tidak valid.")
+    }
+    return err
+}
+
+role, _ := claims.Extra["role"].(string)
+```
+
+Parse otomatis verify:
+- HMAC-SHA256 signature dengan secret
+- `exp` belum lewat
+- `nbf` (kalau ada) sudah lewat
+- `iss` cocok dengan `Config.Issuer` (kalau di-set)
+- Algorithm whitelist HS256 only (cegah `alg: none` attack)
+
+### Strategy (drop-in untuk `middleware.Auth`)
+
+```go
+import (
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/jwt"
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
+    "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
+)
+
+mgr, _ := jwt.New(jwt.Config{Secret: secret})
+
+// Validator = app-specific check (DB lookup, single-device, user_active, dll.)
+validator := func(ctx context.Context, c *jwt.Claims, raw string) (*middleware.AuthClaims, error) {
+    // 1. Lookup user di DB
+    res, err := userRepo.FindByUUID(ctx, c.SubjectUUID, true)
+    if err != nil {
+        return nil, err
+    }
+    user := res.Data
+
+    // 2. Single-device enforcement: token tersimpan harus match
+    if user.Token == nil || *user.Token != raw {
+        return nil, errors.NewUnauthorized("Token tidak valid. Kemungkinan login di perangkat lain.")
+    }
+
+    // 3. Active flag
+    if !user.Active {
+        return nil, errors.NewUnauthorized("Akun Anda telah dinonaktifkan.")
+    }
+
+    // 4. Return claims yang Auth set ke context
+    return &middleware.AuthClaims{
+        SubjectUUID: user.UUID,
+        Role:        user.Role,
+        Extra: map[string]any{
+            "user_full_name": user.FullName,
+        },
+    }, nil
+}
+
+strategy := &jwt.Strategy{
+    Manager:   mgr,
+    Validator: validator,
+}
+
+authMW := middleware.Auth(strategy)
+```
+
+`Validator` boleh `nil` — strategy akan return `AuthClaims{SubjectUUID: claims.SubjectUUID}` saja (cukup untuk service yang tidak butuh DB lookup).
+
+### Multiple JWT signers
+
+Mis. tokens dari service internal vs token dari mitra eksternal. Buat dua strategy dengan name berbeda:
+
+```go
+internalStrategy := &jwt.Strategy{
+    Manager:      mgrInternal,
+    Validator:    validateInternal,
+    StrategyName: "JWT_INTERNAL",
+}
+partnerStrategy := &jwt.Strategy{
+    Manager:      mgrPartner,
+    Validator:    validatePartner,
+    StrategyName: "JWT_PARTNER",
+}
+
+// CanHandle dua-duanya match "Authorization: Bearer ...". Strategy pertama yang
+// punya signature secret valid akan menang. Letakkan internal di depan kalau
+// internal lebih sering dipakai.
+authMW := middleware.Auth(internalStrategy, partnerStrategy)
+```
+
+> **Catatan**: dua strategy yang `CanHandle == true` di-coba berurutan. Kalau strategy pertama gagal `Authenticate` (mis. signature mismatch), framework akan **stop** dan return error — tidak fallback ke strategy berikutnya. Untuk multi-signer, design supaya hanya satu strategy yang `CanHandle` per request (mis. cek `iss` di token sebelum coba verify).
+
+### Errors
+
+`ErrInvalidToken` (sentinel) — wrap-able dengan `errors.Is`. Semua failure di Parse return ini, dengan reason di error message.
+
+### Gotchas
+
+- **Hanya HS256**. Untuk RS256/ES256, butuh extension package terpisah (PR welcome).
+- Issuer mismatch silently rejected. Kalau Anda pernah ganti `Issuer`, token lama akan reject. Roll-out dengan grace period.
+- `Validator` adalah satu-satunya tempat untuk app-level checks. Jangan duplikasi check di handler — handler trust `AuthClaims`.
 
 ---
 
