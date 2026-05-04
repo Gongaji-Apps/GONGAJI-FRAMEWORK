@@ -171,6 +171,9 @@ func (m *Manager) Parse(raw string) (*Claims, error) {
 	if v, ok := mc["sub"].(string); ok {
 		out.SubjectUUID = v
 	}
+	if v, ok := mc["user_uuid"].(string); ok {
+		out.SubjectUUID = v
+	}
 	if v, ok := mc["iss"].(string); ok {
 		out.Issuer = v
 	}
