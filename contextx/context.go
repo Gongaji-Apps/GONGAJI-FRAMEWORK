@@ -5,12 +5,14 @@ import "context"
 type key string
 
 const (
-	RequestIDKey      key = "request_id"
-	CorrelationIDKey  key = "correlation_id"
-	SubjectUUIDKey    key = "subject_uuid"
-	RoleCodeKey       key = "role_code"
+	RequestIDKey       key = "request_id"
+	CorrelationIDKey   key = "correlation_id"
+	SubjectUUIDKey     key = "subject_uuid"
+	SubjectFullNameKey key = "subject_full_name"
+	SubjectEmailKey    key = "subject_email"
+	RoleCodeKey        key = "role_code"
 	PermissionCodesKey key = "permission_codes"
-	AuthTypeKey       key = "auth_type"
+	AuthTypeKey        key = "auth_type"
 )
 
 func WithRequestID(ctx context.Context, id string) context.Context {
@@ -23,6 +25,14 @@ func WithCorrelationID(ctx context.Context, id string) context.Context {
 
 func WithSubjectUUID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, SubjectUUIDKey, id)
+}
+
+func WithSubjectFullName(ctx context.Context, fullName string) context.Context {
+	return context.WithValue(ctx, SubjectFullNameKey, fullName)
+}
+
+func WithSubjectEmail(ctx context.Context, email string) context.Context {
+	return context.WithValue(ctx, SubjectEmailKey, email)
 }
 
 func WithRoleCode(ctx context.Context, code string) context.Context {
@@ -47,6 +57,14 @@ func GetCorrelationID(ctx context.Context) string {
 
 func GetSubjectUUID(ctx context.Context) string {
 	return getString(ctx, SubjectUUIDKey)
+}
+
+func GetSubjectFullName(ctx context.Context) string {
+	return getString(ctx, SubjectFullNameKey)
+}
+
+func GetSubjectEmail(ctx context.Context) string {
+	return getString(ctx, SubjectEmailKey)
 }
 
 func GetRoleCode(ctx context.Context) string {
