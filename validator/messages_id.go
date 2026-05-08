@@ -13,9 +13,10 @@ var messagesID = map[string]string{
 	"gte":      "{field} harus ≥ {param}",
 	"lte":      "{field} harus ≤ {param}",
 	// Customize
-	"notblank":      "{field} tidak boleh hanya spasi",
-	"min_int":       "{field} harus ≥ {param}",
-	"max_int":       "{field} harus ≤ {param}",
-	"max_file_size": "Ukuran {field} melebihi batas {param}MB",
-	"image":         "{field} harus berupa gambar",
+	"notblank":         "{field} tidak boleh hanya spasi",
+	"min_int":          "{field} harus ≥ {param}",
+	"max_int":          "{field} harus ≤ {param}",
+	"numeric_nullable": "{field} tidak boleh mengandung karakter selain angka",
+	"max_file_size":    "Ukuran {field} melebihi batas {param}MB",
+	"image":            "{field} harus berupa gambar",
 }
