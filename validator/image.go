@@ -1,9 +1,12 @@
 package validator
 
 import (
+	"mime/multipart"
+	"path/filepath"
 	"strings"
 
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
+	"github.com/go-playground/validator/v10"
 )
 
 func ValidateImage(contentType string, size int64, maxMB int64) error {
@@ -16,4 +19,28 @@ func ValidateImage(contentType string, size int64, maxMB int64) error {
 	}
 
 	return nil
+}
+
+func imageFile(fl validator.FieldLevel) bool {
+	file, ok := fl.Field().Interface().(*multipart.FileHeader)
+
+	if !ok || file == nil {
+		return false
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+
+	allowed := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+	}
+
+	return allowed[ext]
+}
+
+func init() {
+	Register(func(v *validator.Validate) {
+		v.RegisterValidation("image", imageFile)
+	})
 }

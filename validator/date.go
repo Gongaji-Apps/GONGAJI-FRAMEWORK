@@ -7,7 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func validDate(fl validator.FieldLevel) bool {
+func validateDate(fl validator.FieldLevel) bool {
 	value := strings.TrimSpace(fl.Field().String())
 
 	if value == "" {
@@ -21,6 +21,6 @@ func validDate(fl validator.FieldLevel) bool {
 
 func init() {
 	Register(func(v *validator.Validate) {
-		v.RegisterValidation("date", validDate)
+		v.RegisterValidation("date", validateDate)
 	})
 }
