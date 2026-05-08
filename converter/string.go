@@ -11,7 +11,29 @@ func StringToInt(value string) (*int, error) {
 	result, err := strconv.Atoi(value)
 
 	if err != nil {
-		return nil, fmt.Errorf("[Internal Server Error]12 Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
+		return nil, fmt.Errorf("[Internal Server Error] Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
+	}
+
+	return &result, nil
+}
+
+func StringToInt32(value string) (*int32, error) {
+	result, err := strconv.ParseInt(value, 10, 32)
+
+	if err != nil {
+		return nil, fmt.Errorf("[Internal Server Error] Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
+	}
+
+	int32Result := int32(result)
+
+	return &int32Result, nil
+}
+
+func StringToInt64(value string) (*int64, error) {
+	result, err := strconv.ParseInt(value, 10, 64)
+
+	if err != nil {
+		return nil, fmt.Errorf("[Internal Server Error] Oops! Kami mengalami masalah saat melakukan Konversi Tipe Data String ke Integer. %s", os.Getenv("ADDITIONAL_ERR_500"))
 	}
 
 	return &result, nil
