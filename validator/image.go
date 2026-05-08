@@ -22,9 +22,9 @@ func ValidateImage(contentType string, size int64, maxMB int64) error {
 }
 
 func imageFile(fl validator.FieldLevel) bool {
-	file, ok := fl.Field().Interface().(*multipart.FileHeader)
+	file, ok := fl.Field().Interface().(multipart.FileHeader)
 
-	if !ok || file == nil {
+	if !ok {
 		return false
 	}
 
