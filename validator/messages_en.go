@@ -16,4 +16,7 @@ var messagesEN = map[string]string{
 	"numeric_nullable": "{field} must not contain characters other than numbers",
 	"max_file_size":    "{field} size exceeds {param}MB limit",
 	"image":            "{field} must be an image",
+	"gt":               "{field} must be greater than {param}",
+	"lt":               "{field} must be less than {param}",
+	"unique":           "{field} already exists",
 }

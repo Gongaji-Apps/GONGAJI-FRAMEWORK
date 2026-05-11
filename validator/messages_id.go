@@ -12,6 +12,8 @@ var messagesID = map[string]string{
 	"oneof":    "{field} tidak sesuai pilihan",
 	"gte":      "{field} harus ≥ {param}",
 	"lte":      "{field} harus ≤ {param}",
+	"gt":       "{field} harus lebih besar dari {param}",
+	"lt":       "{field} harus lebih kecil dari {param}",
 	// Customize
 	"notblank":         "{field} tidak boleh hanya spasi",
 	"min_int":          "{field} harus ≥ {param}",
@@ -19,4 +21,5 @@ var messagesID = map[string]string{
 	"numeric_nullable": "{field} tidak boleh mengandung karakter selain angka",
 	"max_file_size":    "Ukuran {field} melebihi batas {param}MB",
 	"image":            "{field} harus berupa gambar",
+	"unique":           "Data {field} sudah ada",
 }
