@@ -16,13 +16,14 @@ func Send(
 	meta any,
 ) {
 	response := Response{
-		StatusCode: statusCode,
-		Status:     status,
-		Message:    message,
-		Data:       data,
-		DataTotal:  dataTotal,
-		Pagination: pagination,
-		Meta:       meta,
+		StatusCode:    statusCode,
+		Status:        status,
+		Message:       message,
+		Data:          data,
+		DataTotal:     dataTotal,
+		Pagination:    pagination,
+		Meta:          meta,
+		VersionStatus: "allow",
 	}
 
 	ctx.JSON(response.StatusCode, response)
