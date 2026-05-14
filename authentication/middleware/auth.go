@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/response"
 	"github.com/gin-gonic/gin"
@@ -8,42 +9,48 @@ import (
 
 // Auth adalah middleware utama yang mendelegasikan ke strategy
 func Auth(strategies ...AuthStrategy) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
+	return func(c *gin.Context) {
 
 		for _, s := range strategies {
-			if !s.CanHandle(ctx) {
+			if !s.CanHandle(c) {
 				continue
 			}
 
 			// Setiap strategy ekstrak token dengan caranya sendiri
-			rawToken, err := s.ExtractToken(ctx)
+			rawToken, err := s.ExtractToken(c)
 			if err != nil {
-				response.Error(ctx, err)
-				ctx.Abort()
+				response.Error(c, err)
+				c.Abort()
 				return
 			}
 
-			claims, err := s.Authenticate(ctx.Request.Context(), rawToken)
+			claims, err := s.Authenticate(c.Request.Context(), rawToken)
 			if err != nil {
-				response.Error(ctx, err)
-				ctx.Abort()
+				response.Error(c, err)
+				c.Abort()
 				return
 			}
 
-			ctx.Set("subject_uuid", claims.SubjectUUID)
-			ctx.Set("role_code", claims.Role)
-			ctx.Set("permission_codes", claims.PermissionCodes)
-			ctx.Set("auth_type", s.Name())
+			ctx := c.Request.Context()
+
+			ctx = contextx.WithSubjectUUID(ctx, claims.SubjectUUID)
+
+			c.Set("subject_uuid", claims.SubjectUUID)
+			c.Set("role_code", claims.Role)
+			c.Set("permission_codes", claims.PermissionCodes)
+			c.Set("auth_type", s.Name())
+
 			for k, v := range claims.Extra {
-				ctx.Set(k, v)
+				c.Set(k, v)
 			}
 
-			ctx.Next()
+			c.Request = c.Request.WithContext(ctx)
+			c.Next()
 			return
 		}
 
-		response.Error(ctx, errors.NewUnauthorized("[Unauthorized] Metode autentikasi tidak dikenali."))
-		ctx.Abort()
+		response.Error(c, errors.NewUnauthorized("[Unauthorized] Metode autentikasi tidak dikenali."))
+		c.Abort()
 	}
 }
 
