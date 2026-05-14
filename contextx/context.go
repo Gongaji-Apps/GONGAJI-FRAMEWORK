@@ -19,12 +19,16 @@ func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, RequestIDKey, id)
 }
 
-func WithCorrelationID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, CorrelationIDKey, id)
-}
-
 func WithSubjectUUID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, SubjectUUIDKey, id)
+}
+
+func GetSubjectUUID(ctx context.Context) string {
+	return getString(ctx, SubjectUUIDKey)
+}
+
+func WithCorrelationID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, CorrelationIDKey, id)
 }
 
 func WithSubjectFullName(ctx context.Context, fullName string) context.Context {
@@ -35,11 +39,19 @@ func WithSubjectEmail(ctx context.Context, email string) context.Context {
 	return context.WithValue(ctx, SubjectEmailKey, email)
 }
 
+func GetSubjectFullName(ctx context.Context) string {
+	return getString(ctx, SubjectFullNameKey)
+}
+
+func GetSubjectEmail(ctx context.Context) string {
+	return getString(ctx, SubjectEmailKey)
+}
+
 func WithRoleCode(ctx context.Context, code string) context.Context {
 	return context.WithValue(ctx, RoleCodeKey, code)
 }
 
-func WithPermissionCodes(ctx context.Context, codes []string) context.Context {
+func WithPermissionCodes(ctx context.Context, codes map[string]bool) context.Context {
 	return context.WithValue(ctx, PermissionCodesKey, codes)
 }
 
@@ -55,24 +67,12 @@ func GetCorrelationID(ctx context.Context) string {
 	return getString(ctx, CorrelationIDKey)
 }
 
-func GetSubjectUUID(ctx context.Context) string {
-	return getString(ctx, SubjectUUIDKey)
-}
-
-func GetSubjectFullName(ctx context.Context) string {
-	return getString(ctx, SubjectFullNameKey)
-}
-
-func GetSubjectEmail(ctx context.Context) string {
-	return getString(ctx, SubjectEmailKey)
-}
-
 func GetRoleCode(ctx context.Context) string {
 	return getString(ctx, RoleCodeKey)
 }
 
-func GetPermissionCodes(ctx context.Context) []string {
-	if v, ok := ctx.Value(PermissionCodesKey).([]string); ok {
+func GetPermissionCodes(ctx context.Context) map[string]bool {
+	if v, ok := ctx.Value(PermissionCodesKey).(map[string]bool); ok {
 		return v
 	}
 	return nil

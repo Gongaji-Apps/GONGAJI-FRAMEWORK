@@ -8,6 +8,8 @@ import (
 
 type AuthClaims struct {
 	SubjectUUID     string
+	SubjectFullName string
+	SubjectEmail    string
 	Role            string
 	PermissionCodes map[string]bool
 	Extra           map[string]any

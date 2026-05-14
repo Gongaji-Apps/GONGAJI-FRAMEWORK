@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/response"
@@ -34,14 +36,14 @@ func Auth(strategies ...AuthStrategy) gin.HandlerFunc {
 			ctx := c.Request.Context()
 
 			ctx = contextx.WithSubjectUUID(ctx, claims.SubjectUUID)
-
-			c.Set("subject_uuid", claims.SubjectUUID)
-			c.Set("role_code", claims.Role)
-			c.Set("permission_codes", claims.PermissionCodes)
-			c.Set("auth_type", s.Name())
+			ctx = contextx.WithSubjectFullName(ctx, claims.SubjectFullName)
+			ctx = contextx.WithSubjectEmail(ctx, claims.SubjectEmail)
+			ctx = contextx.WithRoleCode(ctx, claims.Role)
+			ctx = contextx.WithPermissionCodes(ctx, claims.PermissionCodes)
+			ctx = contextx.WithAuthType(ctx, s.Name())
 
 			for k, v := range claims.Extra {
-				c.Set(k, v)
+				ctx = context.WithValue(ctx, k, v)
 			}
 
 			c.Request = c.Request.WithContext(ctx)
