@@ -3,6 +3,7 @@ package middleware
 import (
 	"strings"
 
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/response"
 	"github.com/gin-gonic/gin"
@@ -30,21 +31,16 @@ const forbiddenMessage = "[Forbidden] Afwan, Anda tidak memiliki izin untuk meng
 //	)
 func AuthorizeRoles(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		raw, exists := c.Get("role_code")
-		if !exists {
-			response.Error(c, errors.NewForbidden(forbiddenMessage))
-			c.Abort()
-			return
-		}
-		userRole, ok := raw.(string)
-		if !ok || userRole == "" {
+		roleCode := contextx.GetRoleCode(c.Request.Context())
+
+		if roleCode == "" {
 			response.Error(c, errors.NewForbidden(forbiddenMessage))
 			c.Abort()
 			return
 		}
 
 		for _, role := range roles {
-			if strings.EqualFold(userRole, role) {
+			if strings.EqualFold(roleCode, role) {
 				c.Next()
 				return
 			}
