@@ -7,6 +7,25 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.7.0] — pesan galat manusiawi (tag git v0.0.56)
+
+### Changed (perilaku pesan — kontrak JSON tetap)
+
+- **`errors.NormalizeDBError`** tak lagi mengembalikan tag mentah `[Duplicate]` / `[Foreign Key]` / `[Not Null]` / `[Check Constraint]` / "[Internal Server Error] … Data <tabel>". Pesan kini kalimat Indonesia: "<Label> yang sama sudah ada…", "<Label> tidak bisa dihapus karena masih dipakai…", "<Kolom> wajib diisi.", dst. `*AppError` yang terbungkus diteruskan apa adanya.
+- **`response.Error`** memakai `errors.As` (AppError terbungkus `%w` tak lagi jadi 500 generik) dan memetakan galat constraint Postgres mentah yang lolos dari service. Pesan 500 generik: `response.PesanGalatUmum`.
+- **`BaseRepository`** 404/500: "<Label> tidak ditemukan." — nama tabel mentah tak pernah tampil.
+- **Validasi**: pesan per medan memakai label manusiawi; `min/max/len/gte/lte` sadar teks (karakter); tag tanpa pesan → "<Label> tidak valid." (bukan "invalid value"); tambah `boolean`, `required_if`, `datetime`, dll. Pesan ringkas "Periksa kembali isian Anda." (ID) / "Please check your input." (EN, `Accept-Language: en…`) menggantikan "Validation Error!". JSON tipe tak cocok → meta medan terkait; JSON rusak → pesan jelas.
+
+### Added
+
+- `errors.RegisterTableLabels`, `errors.RegisterFieldLabels`, `errors.RegisterConstraintMessages`, `errors.TableLabel`, `errors.FieldLabel`, `errors.HumanizeIdentifier`, `errors.IsDBConstraintError`.
+
+### Migrasi
+
+- Klien yang mencocokkan string `"[Duplicate]"` atau `"Validation Error!"` harus beralih ke kode HTTP (409/400) + `meta`.
+
+---
+
 ## [v0.6.0] — mailer/surat: surel HTML bermerek lintas service
 
 ### Added

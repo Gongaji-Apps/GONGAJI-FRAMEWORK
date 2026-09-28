@@ -1,8 +1,10 @@
 package validator
 
 import (
+	"reflect"
 	"strings"
 
+	frameworkErrors "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -14,28 +16,35 @@ func NewTranslator(lang string) *Translator {
 	return &Translator{Lang: lang}
 }
 
+// isEnglish: header Accept-Language diawali "en" (mis. "en", "en-US,en;q=0.9").
+func isEnglish(lang string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(lang)), "en")
+}
+
 func (t *Translator) getMessages() map[string]string {
-	switch t.Lang {
-	case "en":
+	if isEnglish(t.Lang) {
 		return messagesEN
-	default:
-		return messagesID
 	}
+	return messagesID
 }
 
 func (t *Translator) Translate(e validator.FieldError) string {
 	messages := t.getMessages()
 
-	msg, ok := messages[e.Tag()]
+	tag := e.Tag()
+	msg, ok := "", false
+	if e.Kind() == reflect.String {
+		msg, ok = messages[tag+".str"]
+	}
 	if !ok {
-		return "invalid value"
+		msg, ok = messages[tag]
+	}
+	if !ok {
+		msg = messages["_default"]
 	}
 
-	field := strings.ToLower(e.Field())
-	param := e.Param()
-
-	msg = strings.ReplaceAll(msg, "{field}", field)
-	msg = strings.ReplaceAll(msg, "{param}", param)
+	msg = strings.ReplaceAll(msg, "{field}", frameworkErrors.FieldLabel(e.Field()))
+	msg = strings.ReplaceAll(msg, "{param}", strings.ReplaceAll(e.Param(), " ", ", "))
 
 	return msg
 }

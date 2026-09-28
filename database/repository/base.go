@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -159,7 +158,7 @@ func (r *BaseRepository[T]) BaseGetArray(
 	var total int64
 
 	if err := qb.Count(&total).Error; err != nil {
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
+		return nil, frameworkError.NewInternalServerError("Terjadi kesalahan saat mengambil " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.")
 	}
 
 	p = normalizePagination(p)
@@ -167,7 +166,7 @@ func (r *BaseRepository[T]) BaseGetArray(
 	qb = r.applyPagination(qb, p)
 
 	if err := qb.Find(&data).Error; err != nil {
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
+		return nil, frameworkError.NewInternalServerError("Terjadi kesalahan saat mengambil " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.")
 	}
 
 	totalPage := int(math.Ceil(float64(total) / float64(p.Limit)))
@@ -202,13 +201,13 @@ func (r *BaseRepository[T]) BaseGetObject(
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			if notFoundError {
-				return nil, frameworkError.NewNotFound(fmt.Sprintf("Afwan, Data %s tidak ditemukan.", r.TableName))
+				return nil, frameworkError.NewNotFound(labelTabel(r.TableName) + " tidak ditemukan.")
 			}
 
 			return &result.ObjectResult[T]{}, nil
 		}
 
-		return nil, frameworkError.NewInternalServerError(fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mendapatkan Data %s", r.TableName))
+		return nil, frameworkError.NewInternalServerError("Terjadi kesalahan saat mengambil " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.")
 	}
 
 	return &result.ObjectResult[T]{Data: &data}, nil
@@ -221,7 +220,7 @@ func (r *BaseRepository[T]) BaseExists(ctx context.Context, qb *gorm.DB) (bool, 
 	var count int64
 	if err := qb.Count(&count).Error; err != nil {
 		return false, frameworkError.NewInternalServerError(
-			fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat mengecek Data %s", r.TableName),
+			"Terjadi kesalahan saat memeriksa " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.",
 		)
 	}
 	return count > 0, nil
@@ -234,7 +233,7 @@ func (r *BaseRepository[T]) BaseCount(ctx context.Context, qb *gorm.DB) (int64, 
 	var count int64
 	if err := qb.Count(&count).Error; err != nil {
 		return 0, frameworkError.NewInternalServerError(
-			fmt.Sprintf("[Internal Server Error] Afwan, Kami mengalami masalah saat menghitung Data %s", r.TableName),
+			"Terjadi kesalahan saat menghitung " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.",
 		)
 	}
 	return count, nil
@@ -330,4 +329,13 @@ func (r *BaseRepository[T]) BaseDelete(ctx context.Context, tx *gorm.DB, q query
 // ==========================================================
 func (r *BaseRepository[T]) BaseTransaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return r.DB.WithContext(ctx).Transaction(fn)
+}
+
+// labelTabel: label manusiawi tabel terdaftar, atau "Data" — nama tabel
+// mentah tak pernah ditampilkan ke pengguna.
+func labelTabel(table string) string {
+	if l := frameworkError.TableLabel(table); l != "" {
+		return l
+	}
+	return "Data"
 }
