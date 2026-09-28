@@ -11,7 +11,7 @@ import (
 
 // forbiddenMessage is the standardized 403 message used across the
 // framework's authorization middlewares.
-const forbiddenMessage = "[Forbidden] Afwan, Anda tidak memiliki izin untuk mengakses endpoint ini."
+const forbiddenMessage = "Anda tidak memiliki akses untuk tindakan ini."
 
 // AuthorizeRoles guards an endpoint by role code. The caller's role is
 // read from the gin context key "role_code" (set by Auth). The check

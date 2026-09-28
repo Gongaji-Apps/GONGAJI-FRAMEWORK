@@ -60,7 +60,7 @@ func (s *Strategy) CanHandle(c *gin.Context) bool {
 func (s *Strategy) ExtractToken(c *gin.Context) (string, error) {
 	tok, err := authutils.ExtractBearer(c)
 	if err != nil {
-		return "", errors.NewUnauthorized("[Unauthorized] Token bearer tidak ditemukan.")
+		return "", errors.NewUnauthorized("Sesi Anda tidak ditemukan. Silakan masuk kembali.")
 	}
 	return tok, nil
 }
@@ -69,12 +69,12 @@ func (s *Strategy) ExtractToken(c *gin.Context) (string, error) {
 // returns AuthClaims for the request.
 func (s *Strategy) Authenticate(ctx context.Context, raw string) (*middleware.AuthClaims, error) {
 	if s.Manager == nil {
-		return nil, errors.NewInternalServerError("[Internal Server Error] JWT manager tidak dikonfigurasi.")
+		return nil, errors.NewInternalServerError("Terjadi kesalahan di server. Coba lagi beberapa saat lagi.")
 	}
 
 	claims, err := s.Manager.Parse(raw)
 	if err != nil {
-		return nil, errors.NewUnauthorized("[Unauthorized] Token tidak valid atau sudah kadaluarsa. Mohon login ulang.")
+		return nil, errors.NewUnauthorized("Sesi Anda berakhir. Silakan masuk kembali.")
 	}
 
 	if s.Validator != nil {

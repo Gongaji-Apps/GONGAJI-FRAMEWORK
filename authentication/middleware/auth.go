@@ -55,7 +55,7 @@ func Auth(strategies ...AuthStrategy) gin.HandlerFunc {
 			return
 		}
 
-		response.Error(c, errors.NewUnauthorized("[Unauthorized] Metode autentikasi tidak dikenali."))
+		response.Error(c, errors.NewUnauthorized("Sesi Anda tidak dikenali. Silakan masuk kembali."))
 		c.Abort()
 	}
 }
@@ -69,7 +69,7 @@ func RequirePermission(value string) gin.HandlerFunc {
 		codes := contextx.GetPermissionCodes(ctx.Request.Context())
 
 		if codes == nil || !codes[value] {
-			response.Error(ctx, errors.NewForbidden("[Forbidden] Afwan, Anda tidak memiliki izin untuk mengakses endpoint ini."))
+			response.Error(ctx, errors.NewForbidden("Anda tidak memiliki akses untuk tindakan ini."))
 			ctx.Abort()
 			return
 		}

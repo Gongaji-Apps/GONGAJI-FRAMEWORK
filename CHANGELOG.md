@@ -7,6 +7,14 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.7.1] — pesan auth manusiawi (tag git v0.0.57)
+
+### Changed
+
+- `authentication/jwt` & `authentication/middleware`: pesan 401/403 tanpa tag `[Unauthorized]`/`[Forbidden]` ("Sesi Anda berakhir. Silakan masuk kembali.", "Anda tidak memiliki akses untuk tindakan ini.").
+
+---
+
 ## [v0.7.0] — pesan galat manusiawi (tag git v0.0.56)
 
 ### Changed (perilaku pesan — kontrak JSON tetap)
