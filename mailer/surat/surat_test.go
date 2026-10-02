@@ -3,6 +3,7 @@ package surat
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func merekUji() Merek { return GoNgaji("https://learning.gongaji.id/") }
@@ -73,5 +74,118 @@ func TestMerekDiterapkan(t *testing.T) {
 	}
 	if strings.Contains(h, "Tanya Jawab") {
 		t.Fatal("baris bantuan muncul padahal TautanBantuan kosong")
+	}
+}
+
+// Preheader dipotong per HURUF: huruf multibyte (’ —) tak boleh terbelah jadi
+// byte UTF-8 rusak seperti saat dipotong pre[:140].
+func TestPreheaderDipotongPerRune(t *testing.T) {
+	panjang := strings.Repeat("—’", 100) // 200 rune, 600 byte
+	s := Surat{Judul: "J", Teks: panjang}
+	pre := s.preheader()
+	if !utf8Sah(pre) {
+		t.Fatalf("preheader memuat UTF-8 rusak: %q", pre)
+	}
+	if n := len([]rune(pre)); n != batasPreheader {
+		t.Fatalf("panjang preheader %d rune, mau %d", n, batasPreheader)
+	}
+	if (Surat{Judul: "J", Preheader: "eksplisit", Teks: "isi"}).preheader() != "eksplisit" {
+		t.Fatal("Preheader eksplisit tidak dipakai")
+	}
+}
+
+func utf8Sah(s string) bool { return utf8.ValidString(s) }
+
+// Mode gelap: meta color-scheme light dark + lapisan <style>; palet inline
+// tetap terang lengkap. Tak boleh ada hex 8 digit (Outlook desktop) dan warna
+// redup lama yang gagal kontras.
+func TestModeGelapDanPalet(t *testing.T) {
+	h := Surat{Judul: "J", Teks: "isi", Status: "S", CTALabel: "B", CTAURL: "https://x"}.HTML(merekUji())
+	for _, mau := range []string{`content="light dark"`, `prefers-color-scheme:dark`, `class="sb-kartu"`} {
+		if !strings.Contains(h, mau) {
+			t.Fatalf("lapisan mode gelap hilang, mencari %q", mau)
+		}
+	}
+	if strings.Contains(h, "#8792a4") || strings.Contains(h, "#ffffffb3") {
+		t.Fatal("warna lama (kontras rendah / hex 8 digit) masih dipakai")
+	}
+	for i := 0; i+9 < len(h); i++ {
+		if h[i] == '#' && heksa(h[i+1:i+9]) && !heksa(h[i+9:i+10]) {
+			t.Fatalf("hex 8 digit ditemukan: %q", h[i:i+9])
+		}
+	}
+}
+
+func heksa(s string) bool {
+	for _, r := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// Kerangka E4: chip status, sapaan, kotak kode + keterangan, tabel rincian,
+// langkah bernomor, kotak bantuan, alasan — semuanya di-escape.
+func TestKerangkaKartuRincian(t *testing.T) {
+	s := Surat{
+		Judul: "Beasiswamu diterima", Status: "Terpilih <x>", Nada: NadaSukses,
+		Sapaan: SapaanSalam("  Ahmad   <b> "), Teks: "isi",
+		Kode: "BSW-1", KodeKeterangan: "Bebas biaya penuh",
+		Rincian: []Baris{{"Program", "Beasiswa & Batch 1"}, {"Kosong", ""}},
+		Langkah: []string{"Satu", "", "Dua"},
+		Bantuan: "Terkendala biaya?", BantuanLabel: "Lihat cicilan", BantuanURL: "https://x/biaya",
+		Alasan: "Kamu menerima surel ini karena mengajukan beasiswa.",
+	}
+	h := s.HTML(merekUji())
+	for _, mau := range []string{
+		"Terpilih &lt;x&gt;", "sb-chip-sukses", "Assalamu’alaikum Ahmad &lt;b&gt;,", "BSW-1", "Bebas biaya penuh",
+		"Beasiswa &amp; Batch 1", "Yang terjadi selanjutnya", ">2</div>", "Lihat cicilan", "mengajukan beasiswa",
+		`alt="Logo Go Ngaji"`, "https://learning.gongaji.id/logogram-gongaji-white.png",
+	} {
+		if !strings.Contains(h, mau) {
+			t.Fatalf("bagian kerangka hilang, mencari %q", mau)
+		}
+	}
+	if strings.Contains(h, ">Kosong<") || strings.Contains(h, ">3</div>") {
+		t.Fatal("baris rincian/langkah kosong ikut dirender")
+	}
+	teks := s.TeksPolos()
+	for _, mau := range []string{"[Terpilih <x>]", "Program: Beasiswa & Batch 1", "1. Satu\n2. Dua", "Kode: BSW-1 (Bebas biaya penuh)", "Lihat cicilan: https://x/biaya"} {
+		if !strings.Contains(teks, mau) {
+			t.Fatalf("teks polos kurang %q:\n%s", mau, teks)
+		}
+	}
+}
+
+// Satu surel = satu bahasa: kerangka Inggris + tautan FAQ /en/faq; nilai
+// bahasa tak dikenal jatuh ke ID.
+func TestBahasaKerangka(t *testing.T) {
+	en := Surat{Bahasa: "EN-us", Judul: "J", Teks: "isi", Langkah: []string{"a"}, CTALabel: "Go", CTAURL: "https://x"}.HTML(merekUji())
+	for _, mau := range []string{`<html lang="en"`, "Button not working?", "What happens next", "please do not reply", "https://learning.gongaji.id/en/faq"} {
+		if !strings.Contains(en, mau) {
+			t.Fatalf("kerangka Inggris kurang %q", mau)
+		}
+	}
+	if strings.Contains(en, "Tombol tidak berfungsi") {
+		t.Fatal("string Indonesia bocor ke surel Inggris")
+	}
+	id := Surat{Bahasa: "fr", Judul: "J", Teks: "isi"}.HTML(merekUji())
+	if !strings.Contains(id, `<html lang="id"`) || !strings.Contains(id, "mohon tidak membalas") {
+		t.Fatal("bahasa tak dikenal tidak jatuh ke ID")
+	}
+	if SapaanSalam("") != "Assalamu’alaikum," {
+		t.Fatal("sapaan tanpa nama salah")
+	}
+}
+
+// Merek tanpa logo → tanpa <img>; basis kosong → tanpa tautan logo/bantuan.
+func TestTanpaLogo(t *testing.T) {
+	m := GoNgaji("")
+	if m.LogoURL != "" || m.TautanBantuan != "" {
+		t.Fatalf("basis kosong tak boleh menghasilkan URL relatif: %+v", m)
+	}
+	if strings.Contains(Surat{Judul: "J"}.HTML(m), "<img") {
+		t.Fatal("<img> muncul padahal LogoURL kosong")
 	}
 }
