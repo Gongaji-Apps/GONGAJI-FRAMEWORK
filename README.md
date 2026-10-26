@@ -125,6 +125,7 @@ Example response error:
 | [`pagination`](docs/packages.md#pagination) | Metadata pagination | — |
 | [`query`](docs/packages.md#query) | `Query` struct untuk repository | — |
 | [`normalizer`](docs/packages.md#normalizer) | Trim whitespace via struct tag | — |
+| [`compression`](docs/packages.md#compression) | Middleware gzip respons (JSON/teks, ambang minimum, opt-in) | gin |
 | **Database** | | |
 | [`database`](docs/packages.md#database) | Postgres connection helper | gorm + postgres driver |
 | [`database/repository`](docs/packages.md#databaserepository) | Generic `BaseRepository[T]` (CRUD + query + upsert + transaction) | gorm |

@@ -7,6 +7,28 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [Unreleased] — cache untuk menekan biaya egress
+
+### Added
+
+- **`compression`** (package baru): `compression.Gzip(Config)` — middleware gzip opt-in untuk respons JSON/teks dengan ambang `MinLength` (default 1 KB) dan level `BestSpeed`. Isi respons identik setelah dekompresi. Tested.
+- `database`: field opsional `Config.SkipDefaultTransaction` dan `Config.PrepareStmt` (default `false` = perilaku lama). Konstanta `DefaultMaxOpenConns`, `DefaultMaxIdleConns`, `DefaultMaxLifetime`. Test pertama untuk `database` (pool & gorm config, tanpa server).
+- `storage/gcs`: field opsional `Config.CacheControl`. Bila diisi, dipasang sebagai metadata `Cache-Control` pada setiap `Upload`. Kosong = perilaku lama (default GCS `public, max-age=3600` untuk objek publik). Test pertama untuk `storage/gcs` (hermetik, tanpa jaringan).
+
+- `response`: galat **bukan** `*errors.AppError` yang sampai ke `response.Error` kini dicatat (level `error`, JSON: pesan galat asli, `method`, `path`, `status_code`, `request_id`) dan dititipkan ke `ctx.Errors`. Sebelumnya klien dan log sama-sama hanya melihat "Terjadi kesalahan di server" tanpa jejak penyebab (kasus nyata: kunci GCS yang dinonaktifkan). Pesan ke klien tidak berubah. `response.SetLogger(l)` untuk memakai logger service sendiri / buffer di test. Test pertama untuk jalur ini.
+
+### Fixed
+
+- `authentication/jwt.Parse`: token gaya AUTHENTICATION lama (klaim `user_uuid` + `expired` unix detik, tanpa `exp`) kini **ditolak bila sudah lewat** `expired`. Sebelumnya pustaka hanya memvalidasi `exp`, sehingga token lama tidak pernah kedaluwarsa di semua service framework. `Claims.ExpiresAt` terisi dari `expired` bila `exp` tidak ada. Token lama tanpa kedua klaim tetap diterima (perilaku lama).
+
+### Changed
+
+- `database.NewPostgres`: `MaxOpenConns`/`MaxIdleConns`/`MaxLifetime` bernilai 0 kini memakai default aman (10 / 5 / 30 menit), bukan **tanpa batas**. Service yang mengisi nilai eksplisit tak terpengaruh. Anjuran docs "50 untuk service besar" dicabut: di Cloud Run total koneksi = `max-instances × MaxOpenConns`.
+- `storage/gcs`: `DeleteBatch` dibatasi 16 request serentak (sebelumnya tanpa batas). `DeleteFolder` kini paralel (batas sama, sebelumnya satu per satu), mengabaikan objek yang sudah hilang (404), dan mengembalikan galat Delete asli bila ada yang gagal. Diuji dengan server GCS palsu.
+- `response.SuccessWithCache` / `SuccessArrayWithCache`: header `Cache-Control` kini `public, max-age=N`, bukan `public, stale-while-revalidate=N`. SWR tanpa `max-age` membuat respons langsung basi sehingga kesegarannya hanya bergantung pada `Expires`. `Expires` & `ETag` tetap dikirim. Belum ada service consumer yang memanggil helper ini (NGAJI sengaja menulis header manual karena masalah ini), jadi tak ada migrasi.
+
+---
+
 ## [v0.7.1] — pesan auth manusiawi (tag git v0.0.57)
 
 ### Changed

@@ -110,11 +110,11 @@ External:     gorm, gin, redis-go, firebase-admin, ...
 
 ### Tested vs untested
 
-**Sudah tested**: `converter`, `crypto/rsa`, `httputil`, `messaging/whatsapp`, `mailer`, `mailer/surat`, `cloudtask`, `notification/fcm`, `scheduler`, `cache`, `cache/redis`, `authentication/jwt`, `authentication/middleware`, `gormtypes`.
+**Sudah tested**: `converter`, `crypto/rsa`, `httputil`, `messaging/whatsapp`, `mailer`, `mailer/surat`, `cloudtask`, `notification/fcm`, `scheduler`, `cache`, `cache/redis`, `authentication/jwt`, `authentication/middleware`, `gormtypes`, `storage/gcs` (seam `newWriter`), `database` (seam `gormConfig`/`poolSettings`; `database/repository` belum), `compression`, `response` (sebagian: `Error`).
 
 `gormtypes` (baru): tipe kolom Postgres untuk GORM — `JSONB` (jsonb) & `StringArray` (`text[]`). Dipakai service consumer (mis. ngaji) untuk kolom jsonb/array.
 
-**Belum tested**: `database/repository`, `binding`, `validator`, `response`, `errors`, `query`, `result`, `pagination`, `formatter` (kecuali converter), `random`, `timeutil`, `tracer`, `storage/gcs`. Tambahkan test saat menyentuh kode di sini.
+**Belum tested**: `database/repository`, `binding`, `validator`, `response` (selain `Error`), `errors`, `query`, `result`, `pagination`, `formatter` (kecuali converter), `random`, `timeutil`, `tracer`. Tambahkan test saat menyentuh kode di sini.
 
 ### Pattern dependency injection di tested packages
 
