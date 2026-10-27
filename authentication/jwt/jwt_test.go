@@ -212,3 +212,48 @@ func TestGenerate_PerCallIssuerOverride(t *testing.T) {
 		t.Errorf("override issuer should be embedded; got %v", err)
 	}
 }
+
+// legacyToken menandatangani klaim gaya AUTHENTICATION lama (`user_uuid` + `expired`,
+// tanpa `sub`/`exp`) dengan secret manager.
+func legacyToken(t *testing.T, m *Manager, expired int64) string {
+	t.Helper()
+	payload := gojwt.MapClaims{"user_uuid": "user-legacy", "iss": "test-iss"}
+	if expired != 0 {
+		payload["expired"] = expired
+	}
+	raw, err := gojwt.NewWithClaims(gojwt.SigningMethodHS256, payload).SignedString(m.cfg.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func TestParse_LegacyExpiredClaim_Rejected(t *testing.T) {
+	m := newManager(t)
+	_, err := m.Parse(legacyToken(t, m, time.Now().Add(-time.Minute).Unix()))
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for legacy expired token, got %v", err)
+	}
+}
+
+func TestParse_LegacyExpiredClaim_StillValid(t *testing.T) {
+	m := newManager(t)
+	exp := time.Now().Add(time.Hour).Unix()
+	c, err := m.Parse(legacyToken(t, m, exp))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SubjectUUID != "user-legacy" {
+		t.Fatalf("SubjectUUID = %q", c.SubjectUUID)
+	}
+	if c.ExpiresAt.Unix() != exp {
+		t.Fatalf("ExpiresAt = %v, want %v", c.ExpiresAt.Unix(), exp)
+	}
+}
+
+func TestParse_LegacyWithoutExpiry_Accepted(t *testing.T) {
+	m := newManager(t)
+	if _, err := m.Parse(legacyToken(t, m, 0)); err != nil {
+		t.Fatalf("legacy token without expiry should still parse: %v", err)
+	}
+}

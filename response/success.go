@@ -150,9 +150,13 @@ func SuccessArrayWithCache[T any](
 	SuccessArray(ctx, result)
 }
 
+// setCacheHeaders memakai max-age, bukan stale-while-revalidate: SWR tanpa max-age
+// membuat respons langsung basi, sehingga kesegarannya hanya bergantung pada Expires
+// (diabaikan sebagian cache/CDN bila ada Cache-Control). Expires tetap dikirim untuk
+// klien HTTP/1.0 lama.
 func setCacheHeaders(ctx *gin.Context, etag string, maxAge time.Duration) {
 	expireTime := time.Now().Add(maxAge).UTC().Format(http.TimeFormat)
-	ctx.Header("Cache-Control", fmt.Sprintf("public, stale-while-revalidate=%d", int(maxAge.Seconds())))
+	ctx.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", int(maxAge.Seconds())))
 	ctx.Header("Expires", expireTime)
 	if etag != "" {
 		ctx.Header("ETag", etag)

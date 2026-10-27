@@ -93,7 +93,8 @@ response.Error(c, errors.NewNotFound("User tidak ditemukan."))
 ### Gotchas
 
 - `response.Error(c, err)` otomatis baca `*errors.AppError` dan map ke HTTP status. **Selalu return `*errors.AppError`** dari service/repository, jangan raw `error`.
-- `SuccessWithCache` set header `Cache-Control: public, stale-while-revalidate=N`. Untuk private (per-user) cache, pakai `SuccessWithMeta` lalu set header sendiri.
+- Galat yang bukan `*errors.AppError` dijawab 500 dengan pesan umum, **dan dicatat** ke log (pesan asli, `method`, `path`, `request_id`) serta `ctx.Errors`. Ganti loggernya dengan `response.SetLogger(log)` di `main.go` bila ingin satu logger untuk seluruh service.
+- `SuccessWithCache` set header `Cache-Control: public, max-age=N` (+ `Expires` & `ETag`). Untuk private (per-user) cache, pakai `SuccessWithMeta` lalu set header sendiri. Sampai v0.7.1 (tag git v0.0.57) nilainya `public, stale-while-revalidate=N` tanpa `max-age`.
 
 ---
 
@@ -513,10 +514,14 @@ type Config struct {
     Port         string
     SSLMode      string  // "disable", "require", "verify-full"
     TimeZone     string  // "Asia/Jakarta", "UTC"
-    MaxOpenConns int
-    MaxIdleConns int
-    MaxLifetime  time.Duration
+    MaxOpenConns int                  // 0 = DefaultMaxOpenConns (10)
+    MaxIdleConns int                  // 0 = DefaultMaxIdleConns (5)
+    MaxLifetime  time.Duration        // 0 = DefaultMaxLifetime (30m)
     LogLevel     gormlogger.LogLevel  // gormlogger.Silent / Error / Warn / Info
+
+    StatementTimeout       time.Duration // opsional, 0 = nonaktif
+    SkipDefaultTransaction bool          // opsional, false = perilaku lama
+    PrepareStmt            bool          // opsional, false = perilaku lama
 }
 ```
 
@@ -540,8 +545,11 @@ db, err := database.NewPostgres(database.Config{
 
 ### Gotchas
 
-- `MaxOpenConns` terlalu tinggi → connection storm di DB. Aman: 25 untuk service kecil, 50 untuk service besar.
+- `MaxOpenConns` adalah batas **per instance**. Di Cloud Run total koneksi = `max-instances × MaxOpenConns`, dan jumlah semua service yang berbagi DB harus < `max_connections` Postgres (cek `SHOW max_connections;`). Contoh: 50 instance × 50 koneksi = 2.500 koneksi dari SATU service. Dengan `concurrency` 80 dan query singkat, 5–10 per instance biasanya cukup.
+- Nilai 0 (atau negatif) memakai default aman: `DefaultMaxOpenConns`=10, `DefaultMaxIdleConns`=5 (dipangkas ke MaxOpenConns), `DefaultMaxLifetime`=30 menit. Sampai v0.7.1 (tag v0.0.57), 0 berarti **tanpa batas**.
 - `MaxLifetime` >0 supaya connection di-recycle (cegah stale connection setelah DB restart).
+- `SkipDefaultTransaction: true` menghemat 2 round-trip (BEGIN/COMMIT) per Create/Update/Delete. Operasi satu statement tetap atomik; Create/Save **bersama asosiasi** tidak lagi atomik — bungkus dengan `BaseTransaction`.
+- `PrepareStmt: true` meng-cache prepared statement per koneksi. Jangan dipakai di belakang PgBouncer mode transaction/statement.
 
 ---
 
@@ -1535,6 +1543,8 @@ client, _ := storage.NewClient(ctx, option.WithCredentialsFile("sa.json"))
 bucket := gcs.New(client, gcs.Config{
     Bucket:  "my-bucket",
     BaseURL: "https://storage.googleapis.com",
+    // Opsional: metadata Cache-Control untuk setiap Upload (kosong = default GCS).
+    CacheControl: "public, max-age=31536000, immutable",
 })
 defer client.Close()
 ```
@@ -1561,7 +1571,44 @@ ok, err := bucket.Exists(ctx, "files/abc.pdf")
 
 - `BaseURL` biasanya `https://storage.googleapis.com`. Untuk custom domain, sesuaikan.
 - `SignedURL` butuh service account dengan IAM permission `iam.serviceAccountTokenCreator` di project.
-- `DeleteBatch` pakai `errgroup` — semua goroutine di-cancel kalau ada yang gagal.
+- `DeleteBatch` pakai `errgroup` — semua goroutine di-cancel kalau ada yang gagal. Paralelisme dibatasi 16 request serentak (cegah rate limit GCS pada batch besar).
+- `DeleteFolder` menghapus paralel (batas yang sama) sambil membaca halaman listing berikutnya; objek yang sudah hilang (404) tidak dianggap gagal. Bila satu Delete gagal, galat Delete itulah yang dikembalikan.
+- `Config.CacheControl` kosong → GCS memakai default `public, max-age=3600` untuk objek publik, jadi klien mengunduh ulang tiap jam (biaya egress). Isi nilai panjang (`public, max-age=31536000, immutable`) **hanya** kalau path objek selalu unik (UUID/kode acak); objek bernama tetap yang bisa ditimpa (mis. `default.png`) akan tersaji basi sampai max-age habis.
+
+---
+
+## compression
+
+**Tujuan**: middleware gzip untuk respons gin. Isi respons setelah didekompresi identik; yang berubah hanya header transport. Klien Dart/Flutter & browser mendekompresi otomatis.
+
+### Setup
+
+```go
+import "github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/compression"
+
+router := gin.New()
+router.Use(gin.Recovery())
+router.Use(compression.Gzip(compression.Config{
+    // Semua opsional:
+    MinLength:     1024,                 // default 1024 byte
+    Level:         gzip.BestSpeed,       // default BestSpeed (CPU termurah)
+    ExcludedPaths: []string{"/v1/download"},
+}))
+```
+
+### Behavior
+
+- Hanya aktif bila request mengirim `Accept-Encoding: gzip`, bukan `HEAD`, bukan upgrade (WebSocket), dan tanpa header `Range`.
+- Hanya memampatkan `Content-Type` teks: `application/json`, `text/*`, `application/javascript`, `application/xml`, `image/svg+xml`. Biner dan respons yang sudah punya `Content-Encoding` dilewati.
+- Body ditahan sampai `MinLength` byte sebelum diputuskan. Respons lebih kecil dikirim apa adanya. Selama ditahan, `Written()` = false sehingga middleware lain masih bisa memasang header.
+- Saat memampatkan: `Content-Encoding: gzip`, `Vary: Accept-Encoding`, dan `Content-Length` lama **dihapus** (aman untuk handler yang memasang `Content-Length` manual).
+- `Flush()` (streaming/SSE) memutuskan saat itu juga tanpa kompresi bila belum mencapai `MinLength`.
+
+### Gotchas
+
+- Pasang sesudah `gin.Recovery()` dan sebelum route. Middleware yang membungkus writer (mis. cache header) boleh dipasang di group sesudahnya.
+- ETag tidak diubah. Bila ETag dipakai untuk validasi kuat antar-encoding, pertimbangkan ETag lemah (`W/"..."`).
+- Menambah sedikit CPU per respons besar; `BestSpeed` memberi sebagian besar penghematan ukuran JSON (biasanya 70–90%).
 
 ---
 

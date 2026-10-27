@@ -171,7 +171,7 @@ func (m *Manager) Parse(raw string) (*Claims, error) {
 	if v, ok := mc["sub"].(string); ok {
 		out.SubjectUUID = v
 	}
-	if v, ok := mc["user_uuid"].(string); ok {
+	if v, ok := mc["user_uuid"].(string); ok && v != "" {
 		out.SubjectUUID = v
 	}
 	if v, ok := mc["iss"].(string); ok {
@@ -185,6 +185,18 @@ func (m *Manager) Parse(raw string) (*Claims, error) {
 	}
 	if t, ok := unixToTime(mc["nbf"]); ok {
 		out.NotBefore = t
+	}
+
+	// Token lama dari service AUTHENTICATION memakai klaim `user_uuid` + `expired`
+	// (unix detik), bukan `sub` + `exp`. Pustaka hanya memvalidasi `exp`, jadi
+	// tanpa pengecekan ini token lama tidak pernah kedaluwarsa.
+	if out.ExpiresAt.IsZero() {
+		if t, ok := unixToTime(mc["expired"]); ok {
+			out.ExpiresAt = t
+		}
+	}
+	if !out.ExpiresAt.IsZero() && time.Now().After(out.ExpiresAt) {
+		return nil, fmt.Errorf("%w: token is expired", ErrInvalidToken)
 	}
 
 	if m.cfg.Issuer != "" && out.Issuer != m.cfg.Issuer {

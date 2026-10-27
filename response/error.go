@@ -3,10 +3,47 @@ package response
 import (
 	stderrors "errors"
 	"net/http"
+	"sync"
 
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/logger"
 	"github.com/gin-gonic/gin"
 )
+
+// Logger untuk galat tak terduga (bukan *AppError). Default dibuat malas lewat
+// logger.New(); service boleh mengganti dengan SetLogger (mis. logger yang sama
+// dengan main.go, atau buffer di test).
+var (
+	unexpectedLog     *logger.Logger
+	unexpectedLogOnce sync.Once
+	unexpectedLogMu   sync.RWMutex
+)
+
+// SetLogger mengganti logger yang dipakai Error untuk galat tak terduga.
+func SetLogger(l *logger.Logger) {
+	unexpectedLogMu.Lock()
+	defer unexpectedLogMu.Unlock()
+	unexpectedLog = l
+}
+
+func unexpectedLogger() *logger.Logger {
+	unexpectedLogMu.RLock()
+	l := unexpectedLog
+	unexpectedLogMu.RUnlock()
+	if l != nil {
+		return l
+	}
+	unexpectedLogOnce.Do(func() {
+		unexpectedLogMu.Lock()
+		defer unexpectedLogMu.Unlock()
+		if unexpectedLog == nil {
+			unexpectedLog = logger.New()
+		}
+	})
+	unexpectedLogMu.RLock()
+	defer unexpectedLogMu.RUnlock()
+	return unexpectedLog
+}
 
 func httpStatus(err error) int {
 	var appErr *errors.AppError
@@ -54,6 +91,23 @@ func Error(ctx *gin.Context, err error) {
 	if stderrors.As(err, &appErr) {
 		message = appErr.Message
 		meta = appErr.Meta
+	} else if err != nil {
+		// Klien hanya menerima pesan umum; penyebab aslinya dicatat di sini agar
+		// 500 bisa ditelusuri di Cloud Logging, dan dititipkan ke ctx.Errors untuk
+		// middleware yang ingin memprosesnya.
+		_ = ctx.Error(err)
+
+		fields := map[string]any{"status_code": statusCode}
+		if ctx.Request != nil {
+			fields["method"] = ctx.Request.Method
+			fields["path"] = ctx.Request.URL.Path
+		}
+
+		entry := unexpectedLogger().WithFields(fields)
+		if ctx.Request != nil {
+			entry = unexpectedLogger().WithCtx(ctx.Request.Context()).WithFields(fields)
+		}
+		entry.WithError(err).Error("galat tak terduga")
 	}
 
 	Send(
