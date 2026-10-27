@@ -7,7 +7,13 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
-## [Unreleased] — cache untuk menekan biaya egress
+## [Unreleased]
+
+_(belum ada)_
+
+---
+
+## [v0.8.0] — cache untuk menekan biaya egress (tag git v0.0.59, 27 Okt 2026)
 
 ### Added
 
