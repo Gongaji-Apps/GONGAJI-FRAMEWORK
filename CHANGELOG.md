@@ -9,7 +9,9 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ## [Unreleased]
 
-_(belum ada)_
+### Removed
+
+- `response`: field `version_status` (selalu `"allow"`, sisa gating versi aplikasi lama) dihapus dari envelope `Response`. **Breaking** bagi klien yang membacanya; keputusan 28 Okt 2026: tidak ada klien yang memakainya. Service yang mengisinya manual (AUTHENTICATION `login_response`) harus menghapus isian itu saat bump.
 
 ---
 
