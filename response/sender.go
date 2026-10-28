@@ -23,7 +23,6 @@ func Send(
 		DataTotal:     dataTotal,
 		Pagination:    pagination,
 		Meta:          meta,
-		VersionStatus: "allow",
 	}
 
 	ctx.JSON(response.StatusCode, response)
