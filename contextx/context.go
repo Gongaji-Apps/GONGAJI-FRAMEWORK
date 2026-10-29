@@ -143,3 +143,12 @@ func WithOverview(ctx context.Context, value bool) context.Context {
 func GetOverview(ctx context.Context) bool {
 	return getBool(ctx, OverviewKey)
 }
+
+// Privileged mengembalikan ctx dengan role dikosongkan: hook AfterFind yang
+// menyamarkan kolom sensitif untuk role USER tidak lagi berlaku, sehingga service
+// bisa membaca nilai asli untuk validasi internal. Pengganti context.Background()
+// di kode lama: deadline/cancel request dan identitas subjek tetap terbawa.
+// Jangan meneruskan ctx hasil Privileged ke jalur yang membentuk respons klien.
+func Privileged(ctx context.Context) context.Context {
+	return WithRoleCode(ctx, "")
+}

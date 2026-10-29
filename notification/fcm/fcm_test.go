@@ -159,6 +159,66 @@ func TestSend_BuildsMessage(t *testing.T) {
 	}
 }
 
+func TestSend_DefaultHasNoPlatformConfig(t *testing.T) {
+	c, fake := newClient()
+
+	if _, err := c.Send(context.Background(), "tok-1", Notification{Title: "a", Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := fake.sendCalls[0]
+	if msg.Android != nil || msg.APNS != nil {
+		t.Errorf("pesan biasa tidak boleh membawa Android/APNS config: %+v %+v", msg.Android, msg.APNS)
+	}
+}
+
+func TestSend_HighPriority(t *testing.T) {
+	c, fake := newClient()
+
+	_, err := c.Send(context.Background(), "tok-1", Notification{
+		Title: "Pesanan", Body: "dibayar", Module: "STORE", Type: "ORDER", Route: "/order/1",
+		Data:         map[string]string{"content": "{}"},
+		HighPriority: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := fake.sendCalls[0]
+	if msg.Android == nil || msg.Android.Priority != "high" {
+		t.Fatalf("Android = %+v", msg.Android)
+	}
+	if !reflect.DeepEqual(msg.Android.Data, msg.Data) {
+		t.Errorf("Android.Data = %v, mau sama dengan Data %v", msg.Android.Data, msg.Data)
+	}
+	if msg.APNS == nil || msg.APNS.Headers["apns-priority"] != "10" || msg.APNS.Headers["apns-push-type"] != "alert" {
+		t.Fatalf("APNS = %+v", msg.APNS)
+	}
+	aps := msg.APNS.Payload.Aps
+	if aps.Alert == nil || aps.Alert.Title != "Pesanan" || aps.Alert.Body != "dibayar" || aps.Sound != "default" {
+		t.Errorf("Aps = %+v", aps)
+	}
+	if aps.CustomData["module"] != "STORE" || aps.CustomData["content"] != "{}" {
+		t.Errorf("Aps.CustomData = %v", aps.CustomData)
+	}
+	if msg.APNS.Payload.CustomData["route"] != "/order/1" {
+		t.Errorf("Payload.CustomData = %v", msg.APNS.Payload.CustomData)
+	}
+}
+
+func TestSendMulticast_HighPriority(t *testing.T) {
+	c, fake := newClient()
+
+	if _, err := c.SendMulticast(context.Background(), []string{"a", "b"}, Notification{Title: "x", HighPriority: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := fake.multicastCalls[0]
+	if msg.Android == nil || msg.Android.Priority != "high" || msg.APNS == nil {
+		t.Errorf("multicast harus membawa konfigurasi prioritas: %+v %+v", msg.Android, msg.APNS)
+	}
+}
+
 func TestSend_PropagatesError(t *testing.T) {
 	c, fake := newClient()
 	fake.sendErr = errors.New("upstream down")

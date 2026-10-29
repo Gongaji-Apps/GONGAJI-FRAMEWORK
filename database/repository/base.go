@@ -178,6 +178,45 @@ func (r *BaseRepository[T]) BaseGetArray(
 	}, nil
 }
 
+// ================================================================
+// ==================== BASE GET ARRAY GROUPED ====================
+// ================================================================
+
+// BaseGetArrayGrouped adalah BaseGetArray untuk query ber-GROUP BY (atau DISTINCT).
+// BaseGetArray menghitung total dengan COUNT langsung pada query, yang pada
+// GROUP BY menghasilkan satu angka per grup — total dan jumlah halaman salah.
+// Di sini total dihitung dari subquery: SELECT count(*) FROM (<query>) AS sub.
+// qb harus sudah lengkap (join, where, group, having, order) tetapi tanpa
+// limit/offset; pagination dipasang di sini.
+func (r *BaseRepository[T]) BaseGetArrayGrouped(
+	ctx context.Context,
+	qb *gorm.DB,
+	p query.Pagination,
+) (*result.ArrayResult[T], error) {
+	var data []T
+	var total int64
+
+	if err := r.db(ctx, nil).Table("(?) AS sub", qb.Session(&gorm.Session{})).Count(&total).Error; err != nil {
+		return nil, frameworkError.NewInternalServerError("Terjadi kesalahan saat mengambil " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.")
+	}
+
+	p = normalizePagination(p)
+
+	qb = r.applyPagination(qb, p)
+
+	if err := qb.Find(&data).Error; err != nil {
+		return nil, frameworkError.NewInternalServerError("Terjadi kesalahan saat mengambil " + strings.ToLower(labelTabel(r.TableName)) + ". Coba lagi beberapa saat lagi.")
+	}
+
+	totalPage := int(math.Ceil(float64(total) / float64(p.Limit)))
+
+	return &result.ArrayResult[T]{
+		Data:       data,
+		DataTotal:  total,
+		Pagination: pagination.New(p.Pagination, totalPage),
+	}, nil
+}
+
 // =========================================================
 // ==================== BASE GET OBJECT ====================
 // =========================================================

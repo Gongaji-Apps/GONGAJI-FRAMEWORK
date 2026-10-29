@@ -53,6 +53,13 @@ type Notification struct {
 	Type   string
 	Route  string
 	Data   map[string]string
+
+	// HighPriority mengirim sebagai pesan prioritas tinggi supaya tampil segera
+	// walau aplikasi di latar belakang (notifikasi transaksi): Android `priority: high`
+	// dengan data yang sama di AndroidConfig; APNS header `apns-priority: 10` +
+	// `apns-push-type: alert`, alert Title/Body, suara default, dan data yang sama
+	// sebagai custom payload. false = pesan biasa (perilaku lama).
+	HighPriority bool
 }
 
 // Client wraps a *messaging.Client.
@@ -94,10 +101,14 @@ func (c *Client) Send(ctx context.Context, token string, notif Notification) (st
 	if token == "" {
 		return "", errors.New("fcm: token is required")
 	}
+	data := buildData(notif)
+	android, apns := buildPriority(notif, data)
 	msg := &messaging.Message{
 		Token:        token,
 		Notification: buildNotification(notif),
-		Data:         buildData(notif),
+		Data:         data,
+		Android:      android,
+		APNS:         apns,
 	}
 	return c.msg.Send(ctx, msg)
 }
@@ -107,10 +118,14 @@ func (c *Client) SendToTopic(ctx context.Context, topic string, notif Notificati
 	if topic == "" {
 		return "", errors.New("fcm: topic is required")
 	}
+	data := buildData(notif)
+	android, apns := buildPriority(notif, data)
 	msg := &messaging.Message{
 		Topic:        topic,
 		Notification: buildNotification(notif),
-		Data:         buildData(notif),
+		Data:         data,
+		Android:      android,
+		APNS:         apns,
 	}
 	return c.msg.Send(ctx, msg)
 }
@@ -142,6 +157,7 @@ func (c *Client) SendMulticast(
 
 	notification := buildNotification(notif)
 	data := buildData(notif)
+	android, apns := buildPriority(notif, data)
 
 	result := &MulticastResult{}
 
@@ -150,6 +166,8 @@ func (c *Client) SendMulticast(
 			Tokens:       batch,
 			Notification: notification,
 			Data:         data,
+			Android:      android,
+			APNS:         apns,
 		}
 		resp, err := c.msg.SendEachForMulticast(ctx, msg)
 		if err != nil {
@@ -198,6 +216,49 @@ func buildData(n Notification) map[string]string {
 		return nil
 	}
 	return out
+}
+
+// buildPriority menyusun konfigurasi platform untuk HighPriority; nil, nil bila
+// tidak diminta sehingga pesan biasa tidak berubah.
+func buildPriority(n Notification, data map[string]string) (*messaging.AndroidConfig, *messaging.APNSConfig) {
+	if !n.HighPriority {
+		return nil, nil
+	}
+
+	custom := make(map[string]any, len(data))
+	for k, v := range data {
+		custom[k] = v
+	}
+	if len(custom) == 0 {
+		custom = nil
+	}
+
+	var alert *messaging.ApsAlert
+	if n.Title != "" || n.Body != "" {
+		alert = &messaging.ApsAlert{Title: n.Title, Body: n.Body}
+	}
+
+	android := &messaging.AndroidConfig{
+		Priority: "high",
+		Data:     data,
+	}
+
+	apns := &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+			"apns-priority":  "10",
+		},
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				Alert:      alert,
+				Sound:      "default",
+				CustomData: custom,
+			},
+			CustomData: custom,
+		},
+	}
+
+	return android, apns
 }
 
 func chunkTokens(tokens []string, size int) [][]string {
