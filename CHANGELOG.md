@@ -7,7 +7,37 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
-## [Unreleased]
+## [v0.10.0] — konsolidasi helper yang dulu disalin tiap service (tag git v0.0.61, 29 Okt 2026)
+
+Kode yang identik di 7–15 service (`config/env.go`, `config/database.go`, `internal/shared/helper.go`, `repository/grouped.go`, `internal/middleware/gzip.go`) kini ada satu di framework. Tidak ada perubahan perilaku untuk pemakai API yang sudah ada.
+
+### Added
+
+- **`env`** (package baru): `env.Require(keys...)` — gagal cepat dengan pesan yang menyebut SEMUA variabel yang kosong; `env.Get(key, fallback)`; `env.Bool(key)` (hanya `"true"`). Tested. Pengganti `config.Require` yang disalin di 15 service.
+- `database`: `ConfigFromEnv(EnvOptions)` dan `NewPostgresFromEnv(EnvOptions)` membaca `DB_POSTGRES_*` (konstanta `database.Env*`). `EnvOptions{Production, QuietLog, StatementTimeout}` hanya mengatur perilaku: pool `ProductionMaxOpenConns`/`ProductionMaxIdleConns` (20/10) + log Warn di production, `DefaultMax*` (10/5) + log Info di luar itu; `QuietLog` menahan Warn (AUTHENTICATION: token/OTP di parameter query). Tested. Pengganti `config.NewDatabase` yang disalin di 13 service.
+- `database/repository`: `BaseGetArrayGrouped(ctx, qb, p)` — `BaseGetArray` untuk query ber-`GROUP BY`/`DISTINCT`; total dihitung dari subquery `SELECT count(*) FROM (<query>) AS sub`, bukan `COUNT` langsung yang menghasilkan satu angka per grup. Pengganti `grouped_get_array` di IBADAH & STORE (dulu VR).
+- `query`: `Wheres(conditions ...string) []Where` untuk kondisi tetap tanpa argumen, dan `UUIDOrNil(value) any` (`""` → `nil`, karena kolom uuid Postgres menolak string kosong). Tested (test pertama untuk `query`).
+- `contextx`: `Privileged(ctx)` — ctx tanpa role supaya hook AfterFind tidak menyamarkan kolom sensitif saat service perlu nilai asli; deadline/cancel dan identitas subjek tetap terbawa. `WithOverview`/`GetOverview` kini terdokumentasi. Tested (test pertama untuk `contextx`).
+- `notification/fcm`: `Notification.HighPriority` — Android `priority: high` (+ data di `AndroidConfig`) dan APNS `apns-priority: 10`, `apns-push-type: alert`, alert Title/Body, suara default, data sebagai custom payload; berlaku di `Send`, `SendToTopic`, `SendMulticast`. `false` = pesan tidak berubah. Dipakai STORE menggantikan klien Firebase buatan sendiri. Tested.
+
+### Removed
+
+- Direktori kosong `auth/` (sisa sebelum `authentication/`; tidak pernah berisi package sejak v0.4.0).
+
+### Migrasi service (opsional, non-breaking)
+
+| Dulu (salinan di service) | Kini |
+|---|---|
+| `middleware.Gzip()` (`internal/middleware/gzip.go`) | `compression.Gzip(compression.Config{})` |
+| `config.Require(...)` | `env.Require(...)` |
+| `config.NewDatabase()` | `database.NewPostgresFromEnv(database.EnvOptions{Production: gin.Mode() == gin.ReleaseMode})` |
+| `shared.Privileged_Context(ctx)` | `contextx.Privileged(ctx)` |
+| `shared.Wheres(...)` / `shared.Uuid_Or_Nil(v)` | `query.Wheres(...)` / `query.UUIDOrNil(v)` |
+| `grouped_get_array[T](ctx, db, qb, p, label)` | `r.BaseGetArrayGrouped(ctx, qb, p)` |
+
+---
+
+## [v0.9.0] — hapus `version_status` (tag git v0.0.60, 28 Okt 2026)
 
 ### Removed
 

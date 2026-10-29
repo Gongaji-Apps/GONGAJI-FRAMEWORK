@@ -127,7 +127,7 @@ Example response error:
 | [`normalizer`](docs/packages.md#normalizer) | Trim whitespace via struct tag | — |
 | [`compression`](docs/packages.md#compression) | Middleware gzip respons (JSON/teks, ambang minimum, opt-in) | gin |
 | **Database** | | |
-| [`database`](docs/packages.md#database) | Postgres connection helper | gorm + postgres driver |
+| [`database`](docs/packages.md#database) | Postgres connection helper (+ `ConfigFromEnv`/`NewPostgresFromEnv` dari `DB_POSTGRES_*`) | gorm + postgres driver |
 | [`database/repository`](docs/packages.md#databaserepository) | Generic `BaseRepository[T]` (CRUD + query + upsert + transaction) | gorm |
 | **Auth** | | |
 | [`authentication/middleware`](docs/packages.md#authenticationmiddleware) | Strategy-pattern auth + `RequirePermission` + `AuthorizeRoles` | gin |
@@ -145,6 +145,7 @@ Example response error:
 | **Infrastructure** | | |
 | [`cache`](docs/packages.md#cache) + [`cache/redis`](docs/packages.md#cacheredis) | Cache interface + in-memory + Redis impl | redis/go-redis |
 | [`scheduler`](docs/packages.md#scheduler) | Cron-style background job runner | robfig/cron |
+| [`env`](docs/packages.md#env) | Baca env var saat start: `Require` (gagal cepat, sebut nama variabel), `Get`, `Bool` | — |
 | [`logger`](docs/packages.md#logger) | Structured JSON logger dengan request ID | logrus |
 | [`tracer`](docs/packages.md#tracer) | OpenTelemetry tracer setup | otel |
 | **Utilities** | | |

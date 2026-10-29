@@ -25,7 +25,7 @@ Pakai Ctrl+F untuk cari nama function/type yang Anda butuhkan.
 - [httputil](#httputil) · [messaging/whatsapp](#messagingwhatsapp) · [mailer](#mailer) · [notification/fcm](#notificationfcm) · [cloudtask](#cloudtask) · [storage](#storage) · [storage/gcs](#storagegcs)
 
 **Infrastructure:**
-- [cache](#cache) · [cache/redis](#cacheredis) · [scheduler](#scheduler) · [logger](#logger) · [tracer](#tracer)
+- [env](#env) · [cache](#cache) · [cache/redis](#cacheredis) · [scheduler](#scheduler) · [logger](#logger) · [tracer](#tracer)
 
 **Utilities:**
 - [converter](#converter) · [formatter](#formatter) · [random](#random) · [timeutil](#timeutil) · [crypto/rsa](#cryptorsa)
@@ -428,6 +428,17 @@ type Pagination struct {
 }
 ```
 
+### Functions
+
+```go
+// Kondisi tetap tanpa argumen → []Where (jangan untuk nilai dari klien)
+query.Wheres("user_active = true", "deleted_at IS NULL")
+// → []Where{{Query: "user_active = true"}, {Query: "deleted_at IS NULL"}}
+
+// "" → nil: kolom uuid Postgres menolak string kosong, NULL berarti "tidak ada"
+query.Where{Query: "wishlist_user = ?", Args: []any{query.UUIDOrNil(userUUID)}}
+```
+
 ### Examples
 
 ```go
@@ -541,10 +552,24 @@ db, err := database.NewPostgres(database.Config{
     MaxLifetime:  5 * time.Minute,
     LogLevel:     gormlogger.Warn,
 })
+
+// Dari env var DB_POSTGRES_{HOST,PORT,USER,PASSWORD,DATABASE,SSLMODE,TIMEZONE}
+// (konstanta database.Env*). Satu set variabel di semua lingkungan; nilainya
+// ditentukan saat deploy. EnvOptions hanya mengatur perilaku:
+//   Production=true  → pool 20/10 (ProductionMax*), log Warn
+//   Production=false → pool 10/5 (DefaultMax*), log Info
+//   QuietLog=true    → tetap Warn di non-production (parameter query sensitif)
+//   StatementTimeout → diteruskan ke Config.StatementTimeout
+db, err := database.NewPostgresFromEnv(database.EnvOptions{
+    Production: gin.Mode() == gin.ReleaseMode,
+})
+
+cfg := database.ConfigFromEnv(database.EnvOptions{QuietLog: true}) // bila perlu diubah dulu
 ```
 
 ### Gotchas
 
+- Panggil `env.Require(database.EnvHost, ...)` sebelum `NewPostgresFromEnv` supaya variabel yang kosong disebut namanya, bukan galat koneksi yang samar.
 - `MaxOpenConns` adalah batas **per instance**. Di Cloud Run total koneksi = `max-instances × MaxOpenConns`, dan jumlah semua service yang berbagi DB harus < `max_connections` Postgres (cek `SHOW max_connections;`). Contoh: 50 instance × 50 koneksi = 2.500 koneksi dari SATU service. Dengan `concurrency` 80 dan query singkat, 5–10 per instance biasanya cukup.
 - Nilai 0 (atau negatif) memakai default aman: `DefaultMaxOpenConns`=10, `DefaultMaxIdleConns`=5 (dipangkas ke MaxOpenConns), `DefaultMaxLifetime`=30 menit. Sampai v0.7.1 (tag v0.0.57), 0 berarti **tanpa batas**.
 - `MaxLifetime` >0 supaya connection di-recycle (cegah stale connection setelah DB restart).
@@ -578,6 +603,7 @@ func NewBaseRepository[T any](db *gorm.DB, table string) BaseRepository[T]
 | `BaseBuildQuery(ctx, q, custom)` | `*gorm.DB` (chainable) |
 | `BaseBuildQueryFrom(ctx, base, q, custom)` | sama tapi pakai base `*gorm.DB` (untuk preload callback) |
 | `BaseGetArray(ctx, qb, p)` | `*result.ArrayResult[T]` |
+| `BaseGetArrayGrouped(ctx, qb, p)` | sama, untuk query ber-`GROUP BY`/`DISTINCT`: total dari `SELECT count(*) FROM (<query>) AS sub` |
 | `BaseGetObject(ctx, qb, mode, notFound)` | `*result.ObjectResult[T]` (mode: `"FIRST"` atau `"LAST"`) |
 | `BaseExists(ctx, qb)` | `(bool, error)` |
 | `BaseCount(ctx, qb)` | `(int64, error)` |
@@ -661,6 +687,7 @@ Kalau `updateCols` kosong, semua kolom di-update (`UpdateAll: true`).
 - **Selalu pass `*BaseRepository[T]` ke handler/service via pointer**. Method receiver pakai pointer.
 - `BaseGetObject(..., notFoundError=true)` → return `*errors.AppError(NotFound)`. Pakai `false` kalau ingin handle di service layer.
 - `BaseBuildQuery` mengaplikasikan `Wheres`, `Havings`, `Order` lalu jalan `custom(qb)`. Custom boleh override apapun.
+- **Query ber-`GROUP BY` wajib `BaseGetArrayGrouped`.** `BaseGetArray` memakai `COUNT` langsung pada query; pada `GROUP BY` hasilnya satu angka per grup sehingga `data_total` dan jumlah halaman salah (kasus nyata: kategori dzikir, status pesanan).
 - `Debug: true` dari env `APP_DEBUG=true` aktifkan GORM SQL logging. Jangan aktifkan di production.
 
 ---
@@ -988,6 +1015,17 @@ const (
 | `WithRoleCode(ctx, role)` | `GetRoleCode(ctx) string` |
 | `WithPermissionCodes(ctx, []string)` | `GetPermissionCodes(ctx) []string` |
 | `WithAuthType(ctx, type)` | `GetAuthType(ctx) string` |
+| `WithOverview(ctx, bool)` | `GetOverview(ctx) bool` |
+
+### Privileged
+
+```go
+// Role dikosongkan → hook AfterFind yang menyamarkan kolom sensitif untuk role USER
+// tidak berlaku; service bisa membaca nilai asli untuk validasi internal.
+// Pengganti context.Background() di kode lama: deadline/cancel request dan
+// identitas subjek tetap terbawa. Jangan dipakai di jalur yang membentuk respons klien.
+user, err := repo.GetObject(contextx.Privileged(ctx), ...)
+```
 
 ### Examples
 
@@ -1356,6 +1394,12 @@ type Notification struct {
     Type   string             // misal "ORDER_RECEIVED"
     Route  string             // deep link route untuk client app
     Data   map[string]string  // extra payload (merged after Module/Type/Route)
+
+    // Prioritas tinggi (notifikasi transaksi yang harus tampil segera di latar belakang):
+    // Android priority "high" + data di AndroidConfig; APNS apns-priority 10,
+    // apns-push-type alert, alert Title/Body, suara default, data sebagai custom payload.
+    // false = pesan biasa.
+    HighPriority bool
 }
 
 type MulticastResult struct {
@@ -1789,6 +1833,30 @@ Special: `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`.
 - `Register` setelah `Start` = error.
 - `Start` sekali aja — tidak bisa restart setelah `Stop`.
 - Sub-minute schedule butuh `WithSeconds: true`. 5-field cron (`*/5 * * * *`) tidak akan accept 6 field.
+
+---
+
+## env
+
+**Tujuan**: membaca konfigurasi proses dari env var saat start. Di Cloud Run seluruh konfigurasi datang dari env var service (`deploy/env.<env>.yaml` + Secret Manager); `Require` membuat salah konfigurasi gagal cepat dengan pesan yang menyebut nama variabelnya.
+
+### Functions
+
+```go
+// Semua variabel kosong disebut sekaligus (bukan hanya yang pertama).
+// Nilai yang hanya spasi dianggap kosong.
+if err := env.Require("SECRET_KEY", database.EnvHost, database.EnvPassword); err != nil {
+    log.Fatalf("Konfigurasi: %v", err) // "env var wajib belum diisi: SECRET_KEY, DB_POSTGRES_HOST"
+}
+
+port := env.Get("PORT", "8080")      // trim spasi; fallback bila kosong
+dryRun := env.Bool("NOTIF_DRY_RUN")  // true hanya untuk "true" (case-insensitive); "1"/"yes" = false
+```
+
+### Gotchas
+
+- `Bool` sengaja ketat: saklar seperti `CLOUD_TASK_DISABLED` tidak boleh aktif karena nilai yang tak disengaja.
+- Panggil `Require` **sebelum** membuka koneksi DB atau klien pihak ketiga.
 
 ---
 
