@@ -131,7 +131,7 @@ Example response error:
 | [`database/repository`](docs/packages.md#databaserepository) | Generic `BaseRepository[T]` (CRUD + query + upsert + transaction) | gorm |
 | **Auth** | | |
 | [`authentication/middleware`](docs/packages.md#authenticationmiddleware) | Strategy-pattern auth + `RequirePermission` + `AuthorizeRoles` | gin |
-| [`authentication/jwt`](docs/packages.md#authenticationjwt) | JWT generate/parse + ready `AuthStrategy` dengan Validator hook | golang-jwt/jwt |
+| [`authentication/jwt`](docs/packages.md#authenticationjwt) | JWT generate/parse + `AuthStrategy` dengan Validator hook + `NewAccountStrategy` (validator standar: lookup akun, single-device, aktif, role terikat, izin) | golang-jwt/jwt |
 | [`authentication/utils`](docs/packages.md#authenticationutils) | Bearer extractor, API key generator | — |
 | [`contextx`](docs/packages.md#contextx) | Typed context keys (request ID, subject UUID, role, dll.) | — |
 | **Integrasi pihak ketiga** | | |

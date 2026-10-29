@@ -62,3 +62,20 @@ func TestBool(t *testing.T) {
 		}
 	}
 }
+
+func TestInt(t *testing.T) {
+	t.Setenv("ENV_TEST_INT", " 36 ")
+	t.Setenv("ENV_TEST_INT_RUSAK", "abc")
+
+	if got := Int("ENV_TEST_INT", 24); got != 36 {
+		t.Errorf("Int = %d, mau 36", got)
+	}
+
+	if got := Int("ENV_TEST_INT_RUSAK", 24); got != 24 {
+		t.Errorf("bukan angka harus fallback, dapat %d", got)
+	}
+
+	if got := Int("ENV_TEST_INT_TIDAK_ADA", 24); got != 24 {
+		t.Errorf("tidak ada harus fallback, dapat %d", got)
+	}
+}

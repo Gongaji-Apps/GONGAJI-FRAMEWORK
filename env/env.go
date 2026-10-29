@@ -20,6 +20,7 @@ package env
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -56,4 +57,16 @@ func Get(key, fallback string) string {
 // untuk saklar seperti NOTIF_DRY_RUN atau CLOUD_TASK_DISABLED.
 func Bool(key string) bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "true")
+}
+
+// Int membaca env var bilangan bulat; fallback bila kosong atau bukan angka. Dipakai mis.
+// EXPIRED_TOKEN (jam) → time.Duration(env.Int("EXPIRED_TOKEN", 24)) * time.Hour.
+func Int(key string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+
+	if err != nil {
+		return fallback
+	}
+
+	return value
 }

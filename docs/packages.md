@@ -915,6 +915,38 @@ authMW := middleware.Auth(strategy)
 
 `Validator` boleh `nil` — strategy akan return `AuthClaims{SubjectUUID: claims.SubjectUUID}` saja (cukup untuk service yang tidak butuh DB lookup).
 
+### Strategi akun standar: `NewAccountStrategy`
+
+Validator yang sama di semua service GoNgaji (dulu disalin ke 15 `internal/middleware/auth.go`): akun dicari lewat hook `Lookup`, lalu diperiksa single-device, aktif/nonaktif, role terikat (partner/foundation), dan izin opsional. Service hanya menulis adaptor `user_mstr → jwt.Account`.
+
+```go
+strategy, err := jwt.NewAccountStrategy(jwt.AccountStrategyConfig{
+    Secret:     []byte(os.Getenv("SECRET_KEY")),
+    DefaultTTL: time.Duration(env.Int("EXPIRED_TOKEN", 24)) * time.Hour, // 0 = DefaultAccountTTL (24 jam)
+    BoundRoles: map[string]string{                                      // role → nama tautan di Account.Links
+        "ADMINISTRATOR_LEARNING_BRANCH": "Partner",
+        "ADMINISTRATOR_DONATION":        "Foundation",
+    },
+    // SingleDeviceRoles: nil = {"USER"}; []string{} mematikan pemeriksaan.
+    // Permissions: func(ctx, role) (map[string]bool, error) — opsional, mengisi PermissionCodes.
+    Lookup: func(ctx context.Context, uuid string) (*jwt.Account, error) {
+        user, err := userRepo.Get_Object(ctx, ..., "FIRST", false)
+        if err != nil || user.Data == nil {
+            return nil, err // (nil, nil) atau AppError NotFound → 401 "Akun Anda tidak ditemukan"
+        }
+        return &jwt.Account{
+            UUID: user.Data.User_Uuid, FullName: user.Data.User_Full_Name, Email: deref(user.Data.User_Email),
+            Role: deref(user.Data.User_Role), Token: user.Data.User_Token, Active: user.Data.User_Active,
+            Tester: user.Data.User_Tester != nil && *user.Data.User_Tester,
+            Links:  map[string]bool{"Partner": user.Data.User_Partner != nil},
+        }, nil
+    },
+})
+authMiddleware := middleware.Auth(strategy)
+```
+
+Urutan pemeriksaan dan pesan 401 (konstanta `Msg*`): subject kosong → `MsgSessionEnded`; akun tidak ada → `MsgAccountMissing`; token ≠ `Account.Token` untuk role single-device → `MsgOtherDevice`; `Active == false` → `MsgInactive`; role terikat tanpa tautan → "Akun Anda belum tertaut ke <Nama> manapun. Hubungi pengelola.". Galat `Lookup`/`Permissions` selain NotFound diteruskan apa adanya (DB mati tetap 500, bukan 401).
+
 ### Multiple JWT signers
 
 Mis. tokens dari service internal vs token dari mitra eksternal. Buat dua strategy dengan name berbeda:
@@ -1851,6 +1883,7 @@ if err := env.Require("SECRET_KEY", database.EnvHost, database.EnvPassword); err
 
 port := env.Get("PORT", "8080")      // trim spasi; fallback bila kosong
 dryRun := env.Bool("NOTIF_DRY_RUN")  // true hanya untuk "true" (case-insensitive); "1"/"yes" = false
+hours := env.Int("EXPIRED_TOKEN", 24) // bilangan bulat; fallback bila kosong/bukan angka
 ```
 
 ### Gotchas
