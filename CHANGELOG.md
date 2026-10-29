@@ -7,6 +7,21 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.11.0] — validator JWT standar (tag git v0.0.62, 29 Okt 2026)
+
+Tahap 2 konsolidasi: 15 varian `internal/middleware/auth.go` (lookup user + single-device + aktif + role terikat partner/foundation + tester + izin) disatukan menjadi satu konstruktor; service hanya menyisakan adaptor pemetaan `user_mstr → jwt.Account`.
+
+### Added
+
+- `authentication/jwt`: `NewAccountStrategy(AccountStrategyConfig)` → `*Strategy` dengan Validator standar; tipe `Account`, `AccountLookup`, `PermissionLoader`; konstanta pesan 401 `MsgSessionEnded`, `MsgAccountMissing`, `MsgOtherDevice`, `MsgInactive`; `DefaultSingleDeviceRoles = {"USER"}`, `DefaultAccountTTL = 24h`. Akun yang tidak ada (nil atau `AppError` NotFound dari Lookup) → **401**, bukan 404 (dulu bervariasi antar service). Tested.
+- `env`: `Int(key, fallback)`.
+
+### Changed
+
+- Pesan 401 kini seragam di semua service yang memakai `NewAccountStrategy` (gaya "Sesi Anda berakhir. Silakan masuk kembali."); service pola baru (ARTICLE/OTHER/QR/ZISWAF) sebelumnya memakai "[Unauthorized] Token tidak valid.".
+
+---
+
 ## [v0.10.0] — konsolidasi helper yang dulu disalin tiap service (tag git v0.0.61, 29 Okt 2026)
 
 Kode yang identik di 7–15 service (`config/env.go`, `config/database.go`, `internal/shared/helper.go`, `repository/grouped.go`, `internal/middleware/gzip.go`) kini ada satu di framework. Tidak ada perubahan perilaku untuk pemakai API yang sudah ada.
