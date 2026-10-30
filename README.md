@@ -119,7 +119,7 @@ Example response error:
 | **Web API layer** | | |
 | [`response`](docs/packages.md#response) | Response builder standar (Success, Created, Error, dll.) | gin |
 | [`errors`](docs/packages.md#errors) | `AppError` + constructor untuk semua HTTP error | — |
-| [`binding`](docs/packages.md#binding) | Bind + validate + normalize request payload | gin |
+| [`binding`](docs/packages.md#binding) | Bind + validate + normalize request payload; `ListQuery`/`FinishList` untuk endpoint daftar | gin |
 | [`validator`](docs/packages.md#validator) | Custom validator + i18n error messages | go-playground/validator |
 | [`result`](docs/packages.md#result) | `ObjectResult[T]` & `ArrayResult[T]` untuk response generic | — |
 | [`pagination`](docs/packages.md#pagination) | Metadata pagination | — |

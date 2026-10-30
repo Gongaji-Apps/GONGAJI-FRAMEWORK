@@ -200,6 +200,33 @@ Semua function:
 2. Translate validation error ke `errors.NewBadRequestValidation(meta)` dengan i18n message (Accept-Language: `id` atau `en`)
 3. Auto-call `normalizer.NormalizeStruct(&payload)`
 
+### Endpoint daftar: `ListQuery` + `FinishList`
+
+Pola handler `GET /<entitas>/get` yang berulang di tiap service (bind payload domain, bind pagination, `StructToMap`, `ToPreload`) dipadatkan:
+
+```go
+// 1) payload domain + query.Request[P] dengan Pagination terisi (dua bind sekaligus)
+payload, request, err := binding.ListQuery[domain.Category_Mstr, shared.Preload](ctx)
+if err != nil {
+    response.Error(ctx, err)
+    return
+}
+
+// 2) kondisi khusus dari payload → request.Query.Wheres, lalu KOSONGKAN field-nya
+if payload.Category_Name != "" {
+    request.Query.Wheres = append(request.Query.Wheres, query.Where{Query: "category_name ILIKE ?", Args: []any{formatter.WrapLike(payload.Category_Name)}})
+    payload.Category_Name = ""
+}
+
+// 3) Where = StructToMap(payload) (field terisi → kondisi "="), Preload = payload.ToPreload()
+if err := binding.FinishList(&request, payload); err != nil {
+    response.Error(ctx, err)
+    return
+}
+```
+
+`FinishWhere(&request, payload)` untuk payload yang tidak punya `ToPreload()`. `Preloadable[P]` adalah interface `ToPreload() P`.
+
 ### Examples
 
 ```go
@@ -427,6 +454,22 @@ type Pagination struct {
     Pagination int `json:"pagination" form:"pagination"`  // 1-indexed page number
 }
 ```
+
+### Request (paket parameter handler → repository)
+
+```go
+// P = struct flag preload milik service (relasi berbeda tiap domain).
+type Request[P any] struct {
+    Pagination Pagination
+    Query      Query
+    Preload    P
+}
+
+// Di service: alias supaya tanda tangan repository/service tidak berubah
+type Query_Request = query.Request[Preload]
+```
+
+Pengisiannya dari query string ada di [`binding.ListQuery` / `FinishList`](#binding).
 
 ### Functions
 

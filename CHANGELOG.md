@@ -7,6 +7,17 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.12.0] — Request generik & binding endpoint daftar (tag git v0.0.63, 30 Okt 2026)
+
+Tahap 3 konsolidasi: `shared.Query_Request` yang disalin tiap service menjadi `query.Request[P]` (alias di service), dan boilerplate handler daftar (bind payload + pagination + `StructToMap` + `ToPreload`, ±20 baris × ±150 handler) menjadi dua panggilan.
+
+### Added
+
+- `query`: `Request[P any]{Pagination, Query, Preload P}`.
+- `binding`: `ListQuery[T, P](ctx) (T, query.Request[P], error)`, `FinishList[T Preloadable[P], P](&request, payload) error`, `FinishWhere[P](&request, payload) error`, interface `Preloadable[P]`. Tested (test pertama untuk `binding`).
+
+---
+
 ## [v0.11.0] — validator JWT standar (tag git v0.0.62, 29 Okt 2026)
 
 Tahap 2 konsolidasi: 15 varian `internal/middleware/auth.go` (lookup user + single-device + aktif + role terikat partner/foundation + tester + izin) disatukan menjadi satu konstruktor; service hanya menyisakan adaptor pemetaan `user_mstr → jwt.Account`.
