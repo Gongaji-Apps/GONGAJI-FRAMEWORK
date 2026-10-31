@@ -18,6 +18,12 @@ const (
 	DefaultMaxOpenConns = 10
 	DefaultMaxIdleConns = 5
 	DefaultMaxLifetime  = 30 * time.Minute
+
+	// DefaultConnectTimeout membatasi waktu membuka SATU koneksi baru. Tanpa batas,
+	// saat server DB tak terjangkau setiap request menunggu sampai TCP connect
+	// menyerah sendiri (~127 detik di Linux) atau sampai request timeout Cloud Run
+	// (300 detik) — kejadian 29 Okt 2026: semua endpoint menggantung 2–5 menit.
+	DefaultConnectTimeout = 10 * time.Second
 )
 
 type Config struct {
@@ -36,6 +42,10 @@ type Config struct {
 	// StatementTimeout (opsional) menyetel server-side statement_timeout per koneksi
 	// sebagai pengaman query lambat. 0 = tidak diaktifkan (perilaku lama).
 	StatementTimeout time.Duration
+
+	// ConnectTimeout membatasi pembukaan koneksi baru (connect_timeout libpq, dibulatkan
+	// ke atas ke detik penuh). 0 = DefaultConnectTimeout.
+	ConnectTimeout time.Duration
 
 	// SkipDefaultTransaction (opsional) mematikan transaksi implisit GORM pada setiap
 	// Create/Update/Delete. Tiap operasi tulis jadi hemat 2 round-trip (BEGIN/COMMIT)
@@ -83,9 +93,15 @@ func poolSettings(cfg Config) (maxOpen int, maxIdle int, maxLifetime time.Durati
 	return maxOpen, maxIdle, maxLifetime
 }
 
-func NewPostgres(cfg Config) (*gorm.DB, error) {
+// buildDSN juga murni (seam test), seperti gormConfig dan poolSettings.
+func buildDSN(cfg Config) string {
+	connectTimeout := cfg.ConnectTimeout
+	if connectTimeout <= 0 {
+		connectTimeout = DefaultConnectTimeout
+	}
+
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s connect_timeout=%d",
 		cfg.Host,
 		cfg.User,
 		cfg.Password,
@@ -93,13 +109,18 @@ func NewPostgres(cfg Config) (*gorm.DB, error) {
 		cfg.Port,
 		cfg.SSLMode,
 		cfg.TimeZone,
+		int64((connectTimeout+time.Second-1)/time.Second),
 	)
 
 	if cfg.StatementTimeout > 0 {
 		dsn += fmt.Sprintf(" options='-c statement_timeout=%d'", cfg.StatementTimeout.Milliseconds())
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), gormConfig(cfg))
+	return dsn
+}
+
+func NewPostgres(cfg Config) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(buildDSN(cfg)), gormConfig(cfg))
 
 	if err != nil {
 		return nil, err

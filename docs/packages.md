@@ -574,6 +574,7 @@ type Config struct {
     LogLevel     gormlogger.LogLevel  // gormlogger.Silent / Error / Warn / Info
 
     StatementTimeout       time.Duration // opsional, 0 = nonaktif
+    ConnectTimeout         time.Duration // 0 = DefaultConnectTimeout (10s); dibulatkan ke atas ke detik
     SkipDefaultTransaction bool          // opsional, false = perilaku lama
     PrepareStmt            bool          // opsional, false = perilaku lama
 }
@@ -617,6 +618,7 @@ cfg := database.ConfigFromEnv(database.EnvOptions{QuietLog: true}) // bila perlu
 - `MaxOpenConns` adalah batas **per instance**. Di Cloud Run total koneksi = `max-instances × MaxOpenConns`, dan jumlah semua service yang berbagi DB harus < `max_connections` Postgres (cek `SHOW max_connections;`). Contoh: 50 instance × 50 koneksi = 2.500 koneksi dari SATU service. Dengan `concurrency` 80 dan query singkat, 5–10 per instance biasanya cukup.
 - Nilai 0 (atau negatif) memakai default aman: `DefaultMaxOpenConns`=10, `DefaultMaxIdleConns`=5 (dipangkas ke MaxOpenConns), `DefaultMaxLifetime`=30 menit. Sampai v0.7.1 (tag v0.0.57), 0 berarti **tanpa batas**.
 - `MaxLifetime` >0 supaya connection di-recycle (cegah stale connection setelah DB restart).
+- `ConnectTimeout` membatasi pembukaan koneksi baru (default 10 detik, sejak v0.13.0). Tanpa batas, DB yang tak terjangkau membuat setiap request menunggu ~127 detik (TCP connect Linux) sampai 300 detik (request timeout Cloud Run).
 - `SkipDefaultTransaction: true` menghemat 2 round-trip (BEGIN/COMMIT) per Create/Update/Delete. Operasi satu statement tetap atomik; Create/Save **bersama asosiasi** tidak lagi atomik — bungkus dengan `BaseTransaction`.
 - `PrepareStmt: true` meng-cache prepared statement per koneksi. Jangan dipakai di belakang PgBouncer mode transaction/statement.
 
