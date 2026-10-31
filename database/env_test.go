@@ -59,3 +59,23 @@ func TestConfigFromEnv_Profil(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigFromEnv_AnggaranPoolDariEnv(t *testing.T) {
+	setDBEnv(t)
+
+	t.Setenv(EnvMaxOpenConns, "4")
+	t.Setenv(EnvMaxIdleConns, "2")
+
+	cfg := ConfigFromEnv(EnvOptions{Production: true})
+	if cfg.MaxOpenConns != 4 || cfg.MaxIdleConns != 2 {
+		t.Errorf("env harus menimpa profil: open=%d idle=%d", cfg.MaxOpenConns, cfg.MaxIdleConns)
+	}
+
+	t.Setenv(EnvMaxOpenConns, "abc")
+	t.Setenv(EnvMaxIdleConns, "0")
+
+	cfg = ConfigFromEnv(EnvOptions{Production: true})
+	if cfg.MaxOpenConns != ProductionMaxOpenConns || cfg.MaxIdleConns != ProductionMaxIdleConns {
+		t.Errorf("nilai tidak sah harus diabaikan: open=%d idle=%d", cfg.MaxOpenConns, cfg.MaxIdleConns)
+	}
+}

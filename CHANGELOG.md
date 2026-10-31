@@ -7,6 +7,14 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.13.0] — anggaran koneksi DB dari env (tag git v0.0.64, 31 Okt 2026)
+
+### Added
+
+- `database`: `ConfigFromEnv` membaca `DB_MAX_OPEN_CONNS` dan `DB_MAX_IDLE_CONNS` (konstanta `EnvMaxOpenConns`, `EnvMaxIdleConns`); nilai > 0 menimpa profil `EnvOptions`, nilai kosong/tidak sah diabaikan. Alasan: Postgres bersama `max_connections=400`, sedangkan 15 service × 50 instance × 20 koneksi = 15.000 secara teoretis — anggaran ditetapkan saat deploy per service/lingkungan. Tested.
+
+---
+
 ## [v0.12.0] — Request generik & binding endpoint daftar (tag git v0.0.63, 30 Okt 2026)
 
 Tahap 3 konsolidasi: `shared.Query_Request` yang disalin tiap service menjadi `query.Request[P]` (alias di service), dan boilerplate handler daftar (bind payload + pagination + `StructToMap` + `ToPreload`, ±20 baris × ±150 handler) menjadi dua panggilan.
