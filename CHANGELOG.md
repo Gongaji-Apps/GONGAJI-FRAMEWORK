@@ -7,6 +7,19 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.13.0] — anggaran koneksi DB dari env + batas waktu connect (tag git v0.0.64, 31 Okt 2026)
+
+### Added
+
+- `database`: `ConfigFromEnv` membaca `DB_MAX_OPEN_CONNS` dan `DB_MAX_IDLE_CONNS` (konstanta `EnvMaxOpenConns`, `EnvMaxIdleConns`); nilai > 0 menimpa profil `EnvOptions`, nilai kosong/tidak sah diabaikan. Alasan: Postgres bersama `max_connections=400`, sedangkan 15 service × 50 instance × 20 koneksi = 15.000 secara teoretis — anggaran ditetapkan saat deploy per service/lingkungan. Tested.
+- `database`: `Config.ConnectTimeout` → `connect_timeout` di DSN (dibulatkan ke atas ke detik, tak pernah 0). Tested.
+
+### Changed
+
+- `database`: koneksi baru kini dibatasi **`DefaultConnectTimeout` = 10 detik** bila `ConnectTimeout` 0 (dulu tanpa batas). Alasan: 29 Okt 2026 server DB staging tak terjangkau ±25 menit; tanpa batas, setiap request menggantung sampai TCP connect menyerah (~127 detik) atau request timeout Cloud Run (300 detik), menahan slot concurrency instance. Kini gagal cepat dengan galat koneksi biasa. Tidak memengaruhi koneksi yang sehat (membuka koneksi ke DB staging ±0,3–0,6 detik).
+
+---
+
 ## [v0.12.0] — Request generik & binding endpoint daftar (tag git v0.0.63, 30 Okt 2026)
 
 Tahap 3 konsolidasi: `shared.Query_Request` yang disalin tiap service menjadi `query.Request[P]` (alias di service), dan boilerplate handler daftar (bind payload + pagination + `StructToMap` + `ToPreload`, ±20 baris × ±150 handler) menjadi dua panggilan.
