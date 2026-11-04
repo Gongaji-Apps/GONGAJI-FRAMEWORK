@@ -1,6 +1,7 @@
 package database
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -44,5 +45,29 @@ func TestGormConfig(t *testing.T) {
 	if !baru.SkipDefaultTransaction || !baru.PrepareStmt {
 		t.Errorf("opt-in tidak terpasang: SkipDefaultTransaction=%v PrepareStmt=%v",
 			baru.SkipDefaultTransaction, baru.PrepareStmt)
+	}
+}
+
+func TestBuildDSN_ConnectTimeout(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  Config
+		mau  string
+	}{
+		{"nol → default 10 detik", Config{}, "connect_timeout=10"},
+		{"eksplisit", Config{ConnectTimeout: 5 * time.Second}, "connect_timeout=5"},
+		{"pecahan dibulatkan ke atas, tak pernah 0 (0 = tanpa batas di libpq)", Config{ConnectTimeout: 300 * time.Millisecond}, "connect_timeout=1"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if dsn := buildDSN(c.cfg); !strings.Contains(dsn, c.mau) {
+				t.Errorf("DSN tidak memuat %q: %s", c.mau, dsn)
+			}
+		})
+	}
+
+	if dsn := buildDSN(Config{StatementTimeout: 15 * time.Second}); !strings.Contains(dsn, "options='-c statement_timeout=15000'") {
+		t.Errorf("statement_timeout hilang: %s", dsn)
 	}
 }

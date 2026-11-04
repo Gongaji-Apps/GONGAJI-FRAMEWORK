@@ -2,6 +2,8 @@ package database
 
 import (
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -19,6 +21,10 @@ const (
 	EnvDBName   = "DB_POSTGRES_DATABASE"
 	EnvSSLMode  = "DB_POSTGRES_SSLMODE"
 	EnvTimeZone = "DB_POSTGRES_TIMEZONE"
+
+	// Opsional: anggaran pool per instance (menimpa profil EnvOptions bila > 0).
+	EnvMaxOpenConns = "DB_MAX_OPEN_CONNS"
+	EnvMaxIdleConns = "DB_MAX_IDLE_CONNS"
 )
 
 // Ukuran pool profil production. Lebih besar karena melayani trafik nyata;
@@ -73,7 +79,27 @@ func ConfigFromEnv(opts EnvOptions) Config {
 		cfg.LogLevel = logger.Warn
 	}
 
+	// Anggaran koneksi per service/lingkungan dari deploy/env.<env>.yaml. Total koneksi ke
+	// Postgres = max-instances × DB_MAX_OPEN_CONNS untuk SETIAP service yang berbagi server,
+	// jadi nilainya ditetapkan saat deploy, bukan di kode. Kosong/≤0 = profil di atas.
+	if n := positiveEnvInt(EnvMaxOpenConns); n > 0 {
+		cfg.MaxOpenConns = n
+	}
+
+	if n := positiveEnvInt(EnvMaxIdleConns); n > 0 {
+		cfg.MaxIdleConns = n
+	}
+
 	return cfg
+}
+
+func positiveEnvInt(key string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+	if err != nil || n <= 0 {
+		return 0
+	}
+
+	return n
 }
 
 // NewPostgresFromEnv = NewPostgres(ConfigFromEnv(opts)). Panggil env.Require untuk
