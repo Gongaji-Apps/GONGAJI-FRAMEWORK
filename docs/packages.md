@@ -19,7 +19,7 @@ Pakai Ctrl+F untuk cari nama function/type yang Anda butuhkan.
 - [database](#database) · [database/repository](#databaserepository)
 
 **Auth:**
-- [authentication/middleware](#authenticationmiddleware) · [authentication/jwt](#authenticationjwt) · [authentication/utils](#authenticationutils) · [contextx](#contextx)
+- [authentication/middleware](#authenticationmiddleware) · [authentication/jwt](#authenticationjwt) · [identity](#identity) · [authentication/utils](#authenticationutils) · [contextx](#contextx)
 
 **Integrasi pihak ketiga:**
 - [httputil](#httputil) · [messaging/whatsapp](#messagingwhatsapp) · [mailer](#mailer) · [notification/fcm](#notificationfcm) · [cloudtask](#cloudtask) · [storage](#storage) · [storage/gcs](#storagegcs)
@@ -1026,6 +1026,37 @@ authMW := middleware.Auth(internalStrategy, partnerStrategy)
 - **Hanya HS256**. Untuk RS256/ES256, butuh extension package terpisah (PR welcome).
 - Issuer mismatch silently rejected. Kalau Anda pernah ganti `Issuer`, token lama akan reject. Roll-out dengan grace period.
 - `Validator` adalah satu-satunya tempat untuk app-level checks. Jangan duplikasi check di handler — handler trust `AuthClaims`.
+
+---
+
+## identity
+
+**Tujuan**: satu sumber kebenaran untuk kolom `public.user_mstr` yang dibaca service **pembaca** (bukan pemilik tabel). Dulu tiap service menyalin struct `User_Mstr` (24–227 baris, 11 varian) hanya untuk lookup di middleware auth; perubahan struktur `user_mstr` berarti mengedit semua service, dan `SELECT *` ikut memuat kolom rahasia.
+
+### Types
+
+- `UserAccount` — 8 kolom: `user_id`, `user_uuid`, `user_full_name`, `user_email`, `user_role`, `user_token`, `user_active`, `user_tester`. Semua field `json:"-"` (bukan untuk respons API).
+- `(UserAccount).Account() *jwt.Account` — pemetaan ke validator standar (`Tester` nil → false, `Active` nil → dianggap aktif).
+
+### Functions
+
+- `Lookup(db *gorm.DB) jwt.AccountLookup` — dipasang langsung ke `jwt.AccountStrategyConfig.Lookup`. Akun tidak ada → `(nil, nil)` (401); galat DB → `errors.NormalizeDBError` (500).
+- `FindByUUID(db, uuid) *gorm.DB` — query dasarnya (`SELECT` 8 kolom eksplisit, `LIMIT 1`), bila service perlu menyusun sendiri.
+
+### Examples
+
+```go
+strategy, err := jwt.NewAccountStrategy(jwt.AccountStrategyConfig{
+    Secret:     []byte(os.Getenv("SECRET_KEY")),
+    DefaultTTL: time.Duration(env.Int("EXPIRED_TOKEN", 24)) * time.Hour,
+    Lookup:     identity.Lookup(db),
+})
+```
+
+### Gotchas
+
+- Service penulis (`public`, `authentication`, `subscription`) tetap memakai model lengkapnya untuk Create/Update; `identity` hanya untuk membaca.
+- `Tester` kini selalu terisi dari DB. Service yang dulu memetakan sendiri tanpa `Tester` (mis. qulib, subscription) mulai menghormati akun penguji setelah pindah ke `Lookup`.
 
 ---
 
