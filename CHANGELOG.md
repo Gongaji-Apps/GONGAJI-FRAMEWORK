@@ -7,6 +7,14 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.14.0] — paket identity: lookup akun bersama (tag git v0.0.65, 5 Nov 2026)
+
+### Added
+
+- `identity`: `UserAccount` (8 kolom `public.user_mstr` untuk validator JWT), `Lookup(db)` siap pakai untuk `jwt.AccountStrategyConfig.Lookup`, dan `FindByUUID`. Alasan: 15 service menyalin struct `User_Mstr` sendiri hanya untuk lookup middleware; `SELECT *` ikut memuat kolom rahasia, dan perubahan `user_mstr` menuntut edit di semua service. Kini kolom dibaca eksplisit dan semua field `json:"-"`. Tested (SQL via GORM DryRun, pemetaan, JSON).
+
+---
+
 ## [v0.13.0] — anggaran koneksi DB dari env + batas waktu connect (tag git v0.0.64, 31 Okt 2026)
 
 ### Added
