@@ -45,3 +45,13 @@ func TestRequirePermission_NoCodes(t *testing.T) {
 		t.Fatalf("tanpa permission codes harus 403, got %d", code)
 	}
 }
+
+// Wildcard: role super (mis. SUPERADMIN) lolos izin apa pun tanpa bergantung isi tabel.
+func TestRequirePermission_Wildcard(t *testing.T) {
+	if code := runPerm(t, map[string]bool{contextx.PermissionAll: true}, "article.article.manage"); code != http.StatusOK {
+		t.Fatalf("pemegang wildcard harus 200, got %d", code)
+	}
+	if code := runPerm(t, map[string]bool{contextx.PermissionAll: false}, "article.article.manage"); code != http.StatusForbidden {
+		t.Fatalf("wildcard bernilai false bukan izin, got %d", code)
+	}
+}

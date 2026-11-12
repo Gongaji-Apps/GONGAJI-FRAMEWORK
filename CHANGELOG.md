@@ -7,6 +7,19 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.15.0] — RBAC bersama: pemuat izin + wildcard role super (tag git v0.0.66, 12 Nov 2026)
+
+### Added
+
+- `identity`: `Permissions(db, PermissionConfig)` — `jwt.PermissionLoader` yang membaca `auth.role_permission`, di-cache per role (`DefaultPermissionTTL` 60 detik). Role di `SuperRoles` (bawaan `SUPERADMIN`) selalu memegang wildcard tanpa membaca tabel. Gagal baca tabel = izin kosong (403 di `RequirePermission`), request tidak gagal, galat tidak di-cache, `OnError` opsional. Alasan: role tertanam di route (`AuthorizeRoles("ADMINISTRATOR","SUPERADMIN")`) — mengubah siapa boleh apa menuntut edit kode + deploy tiap service. Tested.
+- `contextx`: `PermissionAll` (`"*"`) dan `HasPermission(ctx, code)` (menghormati wildcard).
+
+### Changed
+
+- `authentication/middleware`: `RequirePermission` kini meloloskan pemegang wildcard `contextx.PermissionAll`. Tidak mengubah perilaku service yang pemuat izinnya tak pernah mengisi `"*"` (mis. NGAJI).
+
+---
+
 ## [v0.14.0] — paket identity: lookup akun bersama (tag git v0.0.65, 5 Nov 2026)
 
 ### Added
