@@ -66,9 +66,8 @@ func Auth(strategies ...AuthStrategy) gin.HandlerFunc {
 // memakai envelope framework (response.Error), bukan JSON mentah.
 func RequirePermission(value string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		codes := contextx.GetPermissionCodes(ctx.Request.Context())
-
-		if codes == nil || !codes[value] {
+		// HasPermission menghormati wildcard contextx.PermissionAll (role super).
+		if !contextx.HasPermission(ctx.Request.Context(), value) {
 			response.Error(ctx, errors.NewForbidden("Anda tidak memiliki akses untuk tindakan ini."))
 			ctx.Abort()
 			return

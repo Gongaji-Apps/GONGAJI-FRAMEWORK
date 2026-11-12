@@ -108,6 +108,19 @@ func GetPermissionCodes(ctx context.Context) map[string]bool {
 	return nil
 }
 
+// PermissionAll adalah kode izin wildcard: pemegangnya lolos SEMUA pemeriksaan izin.
+// Diisi pemuat izin untuk role super (mis. SUPERADMIN) supaya role itu tak bisa
+// terkunci dari sistem akibat salah isi tabel izin.
+const PermissionAll = "*"
+
+// HasPermission melaporkan apakah subjek memegang izin code (atau wildcard
+// PermissionAll). Pakai ini di handler/service alih-alih membaca map
+// GetPermissionCodes langsung, supaya wildcard dihormati di semua tempat.
+func HasPermission(ctx context.Context, code string) bool {
+	codes := GetPermissionCodes(ctx)
+	return codes != nil && (codes[code] || codes[PermissionAll])
+}
+
 func GetAuthType(ctx context.Context) string {
 	return getString(ctx, AuthTypeKey)
 }

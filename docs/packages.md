@@ -1043,15 +1043,27 @@ authMW := middleware.Auth(internalStrategy, partnerStrategy)
 - `Lookup(db *gorm.DB) jwt.AccountLookup` — dipasang langsung ke `jwt.AccountStrategyConfig.Lookup`. Akun tidak ada → `(nil, nil)` (401); galat DB → `errors.NormalizeDBError` (500).
 - `FindByUUID(db, uuid) *gorm.DB` — query dasarnya (`SELECT` 8 kolom eksplisit, `LIMIT 1`), bila service perlu menyusun sendiri.
 
+- `Permissions(db *gorm.DB, cfg PermissionConfig) jwt.PermissionLoader` — izin role dari `auth.role_permission`, cache per role (bawaan 60 detik), role super (bawaan `SUPERADMIN`) selalu wildcard.
+
 ### Examples
 
 ```go
 strategy, err := jwt.NewAccountStrategy(jwt.AccountStrategyConfig{
-    Secret:     []byte(os.Getenv("SECRET_KEY")),
-    DefaultTTL: time.Duration(env.Int("EXPIRED_TOKEN", 24)) * time.Hour,
-    Lookup:     identity.Lookup(db),
+    Secret:      []byte(os.Getenv("SECRET_KEY")),
+    DefaultTTL:  time.Duration(env.Int("EXPIRED_TOKEN", 24)) * time.Hour,
+    Lookup:      identity.Lookup(db),
+    Permissions: identity.Permissions(db, identity.PermissionConfig{}),
 })
+
+// Route dijaga izin, bukan daftar role — siapa pemegangnya adalah data di auth.role_permission.
+route.POST("/create", middleware.RequirePermission("article.article.manage"), handler.Create)
 ```
+
+### RBAC
+
+- Kode izin: `<service>.<resource>.manage` + izin terpisah untuk aksi sensitif (`.publish`, `.delete`).
+- Di handler/service pakai `contextx.HasPermission(ctx, code)`, jangan membaca map `GetPermissionCodes` langsung (wildcard role super tak terlihat di sana).
+- Izin **tidak** menggantikan penyaringan baris: "boleh membaca X" tak menjawab "X milik siapa".
 
 ### Gotchas
 
