@@ -144,6 +144,11 @@ func HasModulePermission(ctx context.Context, module string) bool {
 	return CoversModule(GetPermissionCodes(ctx), module)
 }
 
+// RoleUser adalah role pengguna aplikasi: role "terbuka" yang boleh masuk semua
+// service tanpa izin modul (lihat jwt.DefaultOpenRoles) dan karena itu SELALU
+// diperlakukan terbatas oleh IsRestricted.
+const RoleUser = "USER"
+
 // IsRestricted melaporkan apakah subjek harus diperlakukan TERBATAS di modul ini:
 // hanya data miliknya sendiri, hanya konten yang terbit/aktif, kolom internal
 // disembunyikan. Pengganti pola lama `GetRoleCode(ctx) == "USER"`.
@@ -154,10 +159,19 @@ func HasModulePermission(ctx context.Context, module string) bool {
 //
 //	if contextx.IsRestricted(ctx, "article") { payload.Article_Status = "PUBLISHED" }
 //
+// RoleUser SELALU terbatas, walau memegang izin modul: izin yang diberikan ke
+// pengguna aplikasi adalah izin pakai (mis. "ziswaf.catalog.view",
+// "ngaji.enrollment.create"), bukan izin kelola — memegangnya tidak boleh membuka
+// kolom internal atau data nonaktif.
+//
 // Role kosong TIDAK terbatas: itu konteks internal (Privileged, webhook, cron,
 // rute tanpa login) yang perilakunya harus tetap seperti sebelumnya.
 func IsRestricted(ctx context.Context, module string) bool {
-	return GetRoleCode(ctx) != "" && !HasModulePermission(ctx, module)
+	role := GetRoleCode(ctx)
+	if role == "" {
+		return false
+	}
+	return role == RoleUser || !HasModulePermission(ctx, module)
 }
 
 func GetAuthType(ctx context.Context) string {

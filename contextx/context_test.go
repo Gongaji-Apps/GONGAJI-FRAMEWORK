@@ -34,6 +34,7 @@ func TestCoversModuleDanIsRestricted(t *testing.T) {
 		terbatas bool
 	}{
 		{"USER tanpa izin", dengan("USER", map[string]bool{}), true},
+		{"USER ber-izin pakai modul (tetap terbatas)", dengan("USER", map[string]bool{"article.catalog.view": true}), true},
 		{"role asing ber-izin modul lain", dengan("MENTOR", map[string]bool{"ngaji.meeting.manage": true}), true},
 		{"awalan mirip bukan modul yang sama", dengan("X", map[string]bool{"articlex.a": true}), true},
 		{"izin bernilai false", dengan("X", map[string]bool{"article.article.manage": false}), true},

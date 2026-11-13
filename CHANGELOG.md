@@ -7,6 +7,14 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.16.1] — role USER selalu terbatas (tag git v0.0.68, 13 Nov 2026)
+
+### Fixed
+
+- `contextx`: `IsRestricted` kini SELALU true untuk `RoleUser` (`"USER"`, konstanta baru), walau role itu memegang izin modul. Sebelumnya "memegang izin modul apa pun" dianggap pengelola; di staging role USER memegang izin pakai `ziswaf.catalog.view`, sehingga kolom audit dan data nonaktif ZISWAF terbuka untuk pengguna aplikasi (tertangkap smoke staging, tidak pernah sampai production). Izin yang diberikan ke pengguna aplikasi adalah izin pakai, bukan izin kelola. `jwt.DefaultOpenRoles` memakai konstanta yang sama. Tested.
+
+---
+
 ## [v0.16.0] — akses per modul: penjaga pintu masuk + IsRestricted (tag git v0.0.67, 13 Nov 2026)
 
 ### Added
