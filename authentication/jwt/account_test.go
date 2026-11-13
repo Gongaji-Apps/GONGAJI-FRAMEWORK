@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"testing"
+	"time"
 
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 )
@@ -220,5 +221,105 @@ func TestNewAccountStrategy_ServiceModuleButuhPermissions(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("ServiceModule tanpa Permissions harus ditolak saat konstruksi")
+	}
+}
+
+// sesiStrategy: strategi dengan Sessions terpasang + token ber-klaim sid.
+func sesiStrategy(t *testing.T, account *Account, sessions map[string]*Session, lookupErr error) (*Strategy, string) {
+	t.Helper()
+	s, _ := accountStrategy(t, map[string]*Account{"u-1": account}, nil, func(c *AccountStrategyConfig) {
+		c.Sessions = func(ctx context.Context, id string) (*Session, error) {
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			return sessions[id], nil
+		}
+	})
+	token, err := s.Manager.Generate(Claims{SubjectUUID: "u-1", Extra: map[string]any{ClaimSessionID: "s-1", ClaimRole: "KLAIM-TIDAK-DIPERCAYA"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s, token
+}
+
+func TestAccountStrategy_Sesi_RoleSesiMenggantikanRoleAkun(t *testing.T) {
+	// Kolom lama akun = USER dengan token lain (login CMS tidak menimpa token aplikasi):
+	// sesi CMS tetap sah dan role request = role sesi, bukan role akun atau klaim token.
+	sessions := map[string]*Session{}
+	s, token := sesiStrategy(t, &Account{UUID: "u-1", Role: "USER", Token: ptr("token-aplikasi")}, sessions, nil)
+	sessions["s-1"] = &Session{UserUUID: "u-1", Role: "ADMINISTRATOR", Context: ContextCMS, TokenHash: HashToken(token), MemberActive: true}
+
+	claims, err := s.Authenticate(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims.Role != "ADMINISTRATOR" {
+		t.Errorf("role = %q, mau role sesi ADMINISTRATOR", claims.Role)
+	}
+}
+
+func TestAccountStrategy_Sesi_Ditolak(t *testing.T) {
+	kasus := []struct {
+		nama  string
+		ubah  func(*Session)
+		pesan string
+	}{
+		{"dicabut (logout)", func(x *Session) { x.Revoked = true }, MsgSessionEnded},
+		{"dicabut karena login baru", func(x *Session) { x.Revoked, x.Superseded = true, true }, MsgOtherDevice},
+		{"kedaluwarsa", func(x *Session) { x.ExpiresAt = time.Now().Add(-time.Minute) }, MsgSessionEnded},
+		{"milik akun lain", func(x *Session) { x.UserUUID = "u-2" }, MsgSessionEnded},
+		{"hash token beda", func(x *Session) { x.TokenHash = HashToken("token-lain") }, MsgSessionEnded},
+		{"role sesi sudah dicabut dari akun", func(x *Session) { x.MemberActive = false }, MsgSessionEnded},
+	}
+	for _, k := range kasus {
+		sessions := map[string]*Session{}
+		s, token := sesiStrategy(t, &Account{UUID: "u-1", Role: "ADMINISTRATOR"}, sessions, nil)
+		sesi := &Session{UserUUID: "u-1", Role: "ADMINISTRATOR", TokenHash: HashToken(token), MemberActive: true}
+		k.ubah(sesi)
+		sessions["s-1"] = sesi
+		_, err := s.Authenticate(context.Background(), token)
+		if err == nil {
+			t.Errorf("%s: harus ditolak", k.nama)
+			continue
+		}
+		wantUnauthorized(t, err, k.pesan)
+	}
+
+	// sesi tidak ada
+	s, token := sesiStrategy(t, &Account{UUID: "u-1", Role: "ADMINISTRATOR"}, map[string]*Session{}, nil)
+	_, err := s.Authenticate(context.Background(), token)
+	wantUnauthorized(t, err, MsgSessionEnded)
+}
+
+func TestAccountStrategy_Sesi_GalatLookupTidakDianggapSah(t *testing.T) {
+	s, token := sesiStrategy(t, &Account{UUID: "u-1", Role: "ADMINISTRATOR"}, nil, stderrors.New("db mati"))
+	if _, err := s.Authenticate(context.Background(), token); err == nil || err.Error() != "db mati" {
+		t.Errorf("galat lookup sesi harus diteruskan, dapat %v", err)
+	}
+}
+
+func TestAccountStrategy_Sesi_JalurLamaTetapBerlaku(t *testing.T) {
+	// Token TANPA sid pada strategi ber-Sessions → single-device lama.
+	accounts := map[string]*Account{"u-1": {UUID: "u-1", Role: "USER", Token: ptr("token-lama")}}
+	s, tokenLama := accountStrategy(t, accounts, nil, func(c *AccountStrategyConfig) {
+		c.Sessions = func(context.Context, string) (*Session, error) { t.Error("Sessions tak boleh dipanggil"); return nil, nil }
+	})
+	_, err := s.Authenticate(context.Background(), tokenLama)
+	wantUnauthorized(t, err, MsgOtherDevice)
+
+	// Token ber-sid pada strategi TANPA Sessions (service belum naik versi) → jalur lama,
+	// role dari akun; lolos bila token sama dengan kolom lama.
+	s2, _ := accountStrategy(t, accounts, nil, nil)
+	tokenSesi, err := s2.Manager.Generate(Claims{SubjectUUID: "u-1", Extra: map[string]any{ClaimSessionID: "s-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	accounts["u-1"].Token = &tokenSesi
+	claims, err := s2.Authenticate(context.Background(), tokenSesi)
+	if err != nil {
+		t.Fatalf("token ber-sesi harus diterima service lama: %v", err)
+	}
+	if claims.Role != "USER" {
+		t.Errorf("role = %q, mau role akun", claims.Role)
 	}
 }
