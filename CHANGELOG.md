@@ -7,6 +7,19 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.17.0] — multi-role tahap tambah: sesi per konteks + peran aktif (tag git v0.0.69, 13 Nov 2026)
+
+### Added
+
+- `authentication/jwt`: `AccountStrategyConfig.Sessions` (`SessionLookup`), tipe `Session`, klaim `ClaimSessionID`/`ClaimRole`/`ClaimContext`, konteks `ContextApp`/`ContextCMS`, dan `HashToken`. Untuk token yang memuat id sesi: sesi harus ada, milik akun itu, belum dicabut atau kedaluwarsa, hash tokennya cocok, dan akun masih memegang role sesi; lalu **role sesi menggantikan role akun** untuk request itu dan pemeriksaan single-device lama dilewati. Alasan: satu akun akan boleh memegang lebih dari satu role (opsi 3), dengan satu peran aktif per sesi; role di `user_mstr.user_role` dan satu token di `user_mstr.user_token` tidak bisa menampung sesi aplikasi dan CMS sekaligus. Klaim role di token TIDAK dipercaya — yang berlaku baris sesi. Tested.
+- `identity`: `Sessions(db)` membaca `auth.user_session` digabung `auth.user_role` (tanpa cache: pencabutan sesi/role berlaku pada request berikutnya; satu query tambahan per request ber-token sesi), `UserRoleTable`, `UserSessionTable`, `RevokedByNewLogin`. Tested.
+
+### Kompatibilitas
+
+- Tidak ada perubahan untuk service yang tidak memasang `Sessions`: token ber-sesi diperiksa lewat jalur lama (role dari akun, single-device lewat `Account.Token`), jadi service baru boleh naik versi satu per satu dan service lama tetap menerima token baru selama penerbit token masih mengisi `user_mstr.user_token`. Token lama (tanpa id sesi) tetap sah di semua service.
+
+---
+
 ## [v0.16.1] — role USER selalu terbatas (tag git v0.0.68, 13 Nov 2026)
 
 ### Fixed

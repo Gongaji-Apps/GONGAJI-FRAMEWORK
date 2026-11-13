@@ -62,6 +62,16 @@ type AccountStrategyConfig struct {
 	// Permissions (opsional) mengisi AuthClaims.PermissionCodes untuk middleware.RequirePermission.
 	Permissions PermissionLoader
 
+	// Sessions (opsional): pemeriksa sesi untuk token ber-klaim ClaimSessionID
+	// (multi-role: peran aktif per sesi). Bila diisi DAN token memuat id sesi:
+	// sesi harus ada, milik akun itu, belum dicabut/kedaluwarsa, hash tokennya
+	// cocok, dan akun masih memegang role sesi; lalu role sesi MENGGANTIKAN
+	// Account.Role dan pemeriksaan single-device lama dilewati (aturan satu
+	// perangkat sudah ditegakkan saat login: sesi lama di konteks itu dicabut).
+	// Token tanpa id sesi, atau Sessions nil, memakai jalur lama — sehingga
+	// service yang belum memasang Sessions tetap menerima token baru.
+	Sessions SessionLookup
+
 	// ServiceModule (opsional): bila diisi, role di luar OpenRoles wajib memegang
 	// setidaknya satu izin modul ini ("article" → "article.*") atau wildcard; selain
 	// itu ditolak 403 di SEMUA rute berlogin. Token berlaku lintas service, jadi
@@ -100,6 +110,8 @@ const (
 //
 //  1. subject UUID harus ada di token dan akun harus ditemukan (401, bukan 404);
 //  2. single-device untuk SingleDeviceRoles: token bearer harus sama dengan Account.Token;
+//     ATAU, untuk token ber-sesi dengan Sessions terpasang: sesi sah dan role sesi
+//     menjadi role request (lihat AccountStrategyConfig.Sessions);
 //  3. Account.Active false → 401;
 //  4. role di BoundRoles wajib punya tautan terkait (Account.Links[nama] == true);
 //  5. Permissions (bila ada) mengisi PermissionCodes.
@@ -174,7 +186,29 @@ func NewAccountStrategy(cfg AccountStrategyConfig) (*Strategy, error) {
 			return nil, errors.NewUnauthorized(MsgAccountMissing)
 		}
 
-		if singleDevice[account.Role] {
+		sessionID, _ := claims.Extra[ClaimSessionID].(string)
+		if cfg.Sessions != nil && sessionID != "" {
+			session, err := cfg.Sessions(ctx, sessionID)
+			if err != nil {
+				return nil, err
+			}
+			if session == nil || session.UserUUID != account.UUID || session.TokenHash != HashToken(raw) {
+				return nil, errors.NewUnauthorized(MsgSessionEnded)
+			}
+			if session.Revoked {
+				if session.Superseded {
+					return nil, errors.NewUnauthorized(MsgOtherDevice)
+				}
+				return nil, errors.NewUnauthorized(MsgSessionEnded)
+			}
+			if !session.ExpiresAt.IsZero() && !time.Now().Before(session.ExpiresAt) {
+				return nil, errors.NewUnauthorized(MsgSessionEnded)
+			}
+			if !session.MemberActive || session.Role == "" {
+				return nil, errors.NewUnauthorized(MsgSessionEnded)
+			}
+			account.Role = session.Role
+		} else if singleDevice[account.Role] {
 			if account.Token == nil || *account.Token != raw {
 				return nil, errors.NewUnauthorized(MsgOtherDevice)
 			}
