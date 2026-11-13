@@ -78,7 +78,7 @@ type AccountStrategyConfig struct {
 }
 
 // DefaultOpenRoles: role yang selalu boleh masuk service ber-ServiceModule.
-var DefaultOpenRoles = []string{"USER"}
+var DefaultOpenRoles = []string{contextx.RoleUser}
 
 // MsgNoModuleAccess: 403 untuk role tanpa izin di service ini.
 const MsgNoModuleAccess = "Akun Anda tidak memiliki akses ke layanan ini."
