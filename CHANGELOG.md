@@ -7,6 +7,15 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.16.0] — akses per modul: penjaga pintu masuk + IsRestricted (tag git v0.0.67, 13 Nov 2026)
+
+### Added
+
+- `authentication/jwt`: `AccountStrategyConfig.ServiceModule` + `OpenRoles` (bawaan `DefaultOpenRoles` = `USER`). Bila diisi, role di luar `OpenRoles` wajib memegang setidaknya satu izin modul itu (`"article"` → `article.*`) atau wildcard; selain itu 403 `MsgNoModuleAccess` di semua rute berlogin. Alasan: token berlaku lintas service, sehingga akun pengelola produk lain (mentor, admin lembaga, dst.) bisa memanggil service yang bukan urusannya. Tested.
+- `contextx`: `CoversModule(codes, module)`, `HasModulePermission(ctx, module)`, dan `IsRestricted(ctx, module)` — pengganti pola `GetRoleCode(ctx) == "USER"`. Pola lama adalah daftar-tolak satu role (role lain lolos tanpa batasan); `IsRestricted` membalik bawaannya: terbatas kecuali memegang izin modul. Role kosong (Privileged, webhook, cron, rute tanpa login) tetap tidak terbatas. Tested.
+
+---
+
 ## [v0.15.0] — RBAC bersama: pemuat izin + wildcard role super (tag git v0.0.66, 12 Nov 2026)
 
 ### Added

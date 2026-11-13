@@ -1064,6 +1064,8 @@ route.POST("/create", middleware.RequirePermission("article.article.manage"), ha
 - Kode izin: `<service>.<resource>.manage` + izin terpisah untuk aksi sensitif (`.publish`, `.delete`).
 - Di handler/service pakai `contextx.HasPermission(ctx, code)`, jangan membaca map `GetPermissionCodes` langsung (wildcard role super tak terlihat di sana).
 - Izin **tidak** menggantikan penyaringan baris: "boleh membaca X" tak menjawab "X milik siapa".
+- **Pintu masuk per service**: isi `AccountStrategyConfig.ServiceModule` ("article") supaya role selain `USER` yang tak memegang izin `article.*` ditolak 403 di semua rute berlogin.
+- **Bawaan terbatas**: jangan menulis `if GetRoleCode(ctx) == "USER" { batasi }` — role lain yang bukan pengelola lolos. Tulis `if contextx.IsRestricted(ctx, "article") { batasi }`: terbatas adalah bawaan, longgar hanya bagi pemegang izin modul. Konteks internal (role kosong) tidak terbatas.
 
 ### Gotchas
 

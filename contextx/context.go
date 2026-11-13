@@ -1,6 +1,9 @@
 package contextx
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 type key string
 
@@ -119,6 +122,42 @@ const PermissionAll = "*"
 func HasPermission(ctx context.Context, code string) bool {
 	codes := GetPermissionCodes(ctx)
 	return codes != nil && (codes[code] || codes[PermissionAll])
+}
+
+// CoversModule melaporkan apakah kumpulan izin memuat wildcard PermissionAll atau
+// setidaknya satu izin modul itu ("article" → "article.*").
+func CoversModule(codes map[string]bool, module string) bool {
+	if codes[PermissionAll] {
+		return true
+	}
+	prefix := module + "."
+	for code, held := range codes {
+		if held && strings.HasPrefix(code, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasModulePermission: subjek memegang setidaknya satu izin modul (atau wildcard).
+func HasModulePermission(ctx context.Context, module string) bool {
+	return CoversModule(GetPermissionCodes(ctx), module)
+}
+
+// IsRestricted melaporkan apakah subjek harus diperlakukan TERBATAS di modul ini:
+// hanya data miliknya sendiri, hanya konten yang terbit/aktif, kolom internal
+// disembunyikan. Pengganti pola lama `GetRoleCode(ctx) == "USER"`.
+//
+// Pola lama adalah daftar-tolak satu role: role lain yang bukan pengelola (mentor,
+// admin produk lain, dst.) lolos tanpa batasan. Di sini kebalikannya — terbatas
+// adalah BAWAAN, dan longgar hanya bagi pemegang izin modul:
+//
+//	if contextx.IsRestricted(ctx, "article") { payload.Article_Status = "PUBLISHED" }
+//
+// Role kosong TIDAK terbatas: itu konteks internal (Privileged, webhook, cron,
+// rute tanpa login) yang perilakunya harus tetap seperti sebelumnya.
+func IsRestricted(ctx context.Context, module string) bool {
+	return GetRoleCode(ctx) != "" && !HasModulePermission(ctx, module)
 }
 
 func GetAuthType(ctx context.Context) string {

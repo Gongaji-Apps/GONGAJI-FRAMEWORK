@@ -170,3 +170,55 @@ func TestAccountStrategy_TokenTanpaSubject(t *testing.T) {
 	_, err := s.Authenticate(context.Background(), token)
 	wantUnauthorized(t, err, MsgAccountMissing)
 }
+
+// ServiceModule: role di luar OpenRoles wajib memegang izin modul (atau wildcard).
+func TestAccountStrategy_ServiceModule(t *testing.T) {
+	izin := map[string]map[string]bool{
+		"USER":          {},
+		"MENTOR":        {"ngaji.meeting.manage": true},
+		"ADMINISTRATOR": {"article.article.manage": true},
+		"SUPERADMIN":    {"*": true},
+		"ARTICLEX":      {"articlex.sesuatu": true},
+	}
+	jalankan := func(role string, mod func(*AccountStrategyConfig)) error {
+		s, token := accountStrategy(t, map[string]*Account{"u-1": {UUID: "u-1", Role: role}}, nil, func(c *AccountStrategyConfig) {
+			c.SingleDeviceRoles = []string{}
+			c.ServiceModule = "article"
+			c.Permissions = func(ctx context.Context, r string) (map[string]bool, error) { return izin[r], nil }
+			if mod != nil {
+				mod(c)
+			}
+		})
+		_, err := s.Authenticate(context.Background(), token)
+		return err
+	}
+
+	for _, role := range []string{"USER", "ADMINISTRATOR", "SUPERADMIN"} {
+		if err := jalankan(role, nil); err != nil {
+			t.Errorf("%s harus lolos di modul article: %v", role, err)
+		}
+	}
+	for _, role := range []string{"MENTOR", "ARTICLEX"} {
+		err := jalankan(role, nil)
+		var appErr *errors.AppError
+		if !stderrors.As(err, &appErr) || appErr.Code != errors.Forbidden {
+			t.Errorf("%s tanpa izin article.* harus 403, dapat %v", role, err)
+		}
+	}
+
+	// OpenRoles kosong (bukan nil): USER pun butuh izin modul.
+	if err := jalankan("USER", func(c *AccountStrategyConfig) { c.OpenRoles = []string{} }); err == nil {
+		t.Error("OpenRoles kosong: USER tanpa izin modul harus ditolak")
+	}
+}
+
+func TestNewAccountStrategy_ServiceModuleButuhPermissions(t *testing.T) {
+	_, err := NewAccountStrategy(AccountStrategyConfig{
+		Secret:        []byte("rahasia-uji"),
+		Lookup:        func(ctx context.Context, uuid string) (*Account, error) { return nil, nil },
+		ServiceModule: "article",
+	})
+	if err == nil {
+		t.Error("ServiceModule tanpa Permissions harus ditolak saat konstruksi")
+	}
+}
