@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/authentication/middleware"
+	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/contextx"
 	"github.com/Gongaji-Apps/GONGAJI-FRAMEWORK/errors"
 )
 
@@ -61,9 +62,26 @@ type AccountStrategyConfig struct {
 	// Permissions (opsional) mengisi AuthClaims.PermissionCodes untuk middleware.RequirePermission.
 	Permissions PermissionLoader
 
+	// ServiceModule (opsional): bila diisi, role di luar OpenRoles wajib memegang
+	// setidaknya satu izin modul ini ("article" → "article.*") atau wildcard; selain
+	// itu ditolak 403 di SEMUA rute berlogin. Token berlaku lintas service, jadi
+	// tanpa ini akun pengelola produk lain bisa memanggil service yang bukan urusannya.
+	// Butuh Permissions.
+	ServiceModule string
+
+	// OpenRoles: role yang tak butuh izin modul (pengguna aplikasi). nil =
+	// DefaultOpenRoles; slice kosong (bukan nil) = semua role butuh izin modul.
+	OpenRoles []string
+
 	// StrategyName opsional (lihat Strategy.StrategyName).
 	StrategyName string
 }
+
+// DefaultOpenRoles: role yang selalu boleh masuk service ber-ServiceModule.
+var DefaultOpenRoles = []string{"USER"}
+
+// MsgNoModuleAccess: 403 untuk role tanpa izin di service ini.
+const MsgNoModuleAccess = "Akun Anda tidak memiliki akses ke layanan ini."
 
 // DefaultAccountTTL dipakai Generate bila DefaultTTL tidak diisi.
 const DefaultAccountTTL = 24 * time.Hour
@@ -106,6 +124,18 @@ const (
 func NewAccountStrategy(cfg AccountStrategyConfig) (*Strategy, error) {
 	if cfg.Lookup == nil {
 		return nil, stderrors.New("jwt: AccountStrategyConfig.Lookup is required")
+	}
+	if cfg.ServiceModule != "" && cfg.Permissions == nil {
+		return nil, stderrors.New("jwt: AccountStrategyConfig.ServiceModule requires Permissions")
+	}
+
+	openRoles := cfg.OpenRoles
+	if openRoles == nil {
+		openRoles = DefaultOpenRoles
+	}
+	open := make(map[string]bool, len(openRoles))
+	for _, role := range openRoles {
+		open[role] = true
 	}
 
 	ttl := cfg.DefaultTTL
@@ -167,6 +197,10 @@ func NewAccountStrategy(cfg AccountStrategyConfig) (*Strategy, error) {
 			if permissions == nil {
 				permissions = map[string]bool{}
 			}
+		}
+
+		if cfg.ServiceModule != "" && !open[account.Role] && !contextx.CoversModule(permissions, cfg.ServiceModule) {
+			return nil, errors.NewForbidden(MsgNoModuleAccess)
 		}
 
 		extra := account.Extra
