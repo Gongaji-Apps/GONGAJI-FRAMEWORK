@@ -7,6 +7,18 @@ Selama `v0.x`, **breaking change boleh terjadi di minor version**. Setelah `v1.0
 
 ---
 
+## [v0.18.0] — kolom sesi ber-prefiks users_ (tag git v0.0.70, 18 Nov 2026)
+
+### Changed
+
+- `identity`: `Sessions(db)` membaca kolom `auth.user_session` yang baru — `users_id`, `users_context`, `users_token_hash`, `users_expired_at`, `users_revoked_at`, `users_revoked_reason` (dulu `session_*`, `*_date`). Alasan: kolom auth diseragamkan ke prefiks per tabel (keputusan pemilik produk 18 Nov 2026). Tested.
+
+### Kompatibilitas
+
+- **Butuh GONGAJI-DB inti V16** (kolom `users_*` + trigger kembar `auth.fn_user_session_kembar` yang menyinkronkan kolom lama ↔ baru). Selama V16 berlaku, service dengan v0.0.69 (kolom lama) dan v0.0.70 (kolom baru) sama-sama benar, jadi service boleh naik versi satu per satu. Kolom `session_*` baru dibuang (migrasi contract) setelah SEMUA service pembaca sesi memakai v0.0.70.
+
+---
+
 ## [v0.17.0] — multi-role tahap tambah: sesi per konteks + peran aktif (tag git v0.0.69, 13 Nov 2026)
 
 ### Added

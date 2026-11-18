@@ -15,14 +15,14 @@ func TestSessionQuery(t *testing.T) {
 		"FROM auth.user_session AS s",
 		"LEFT JOIN auth.user_role AS r ON r.user_uuid = s.user_uuid AND r.role_code = s.role_code",
 		"r.urole_active AS member_active",
-		"s.session_id = $1",
+		"s.users_id = $1",
 	} {
 		if !strings.Contains(sql, want) {
 			t.Errorf("SQL tidak memuat %q: %s", want, sql)
 		}
 	}
 	// Token asli tidak pernah ada di tabel; yang dibaca hanya hash-nya.
-	if !strings.Contains(sql, "session_token_hash") {
+	if !strings.Contains(sql, "users_token_hash") {
 		t.Errorf("hash token harus dibaca: %s", sql)
 	}
 	if len(stmt.Vars) < 1 || stmt.Vars[0] != "s-1" {
