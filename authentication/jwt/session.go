@@ -10,7 +10,7 @@ import (
 // Klaim tambahan token ber-sesi (multi-role, opsi 3). Token lama tidak memuatnya dan
 // tetap diperiksa lewat jalur lama (role dari akun, single-device lewat Account.Token).
 const (
-	// ClaimSessionID: id baris sesi (auth.user_session.session_id).
+	// ClaimSessionID: id baris sesi (auth.user_session.users_id).
 	ClaimSessionID = "sid"
 	// ClaimRole: peran aktif sesi. HANYA informasi untuk klien — yang berlaku adalah
 	// role pada baris sesi, bukan klaim ini.

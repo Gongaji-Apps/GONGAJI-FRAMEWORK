@@ -22,14 +22,15 @@ const (
 const RevokedByNewLogin = "login_baru"
 
 // sessionRow: kolom yang dibaca pemeriksa sesi — sesi + status keanggotaan role-nya.
+// Kolom sesi ber-prefiks users_ (GONGAJI-DB inti V16).
 type sessionRow struct {
 	UserUUID      string     `gorm:"column:user_uuid"`
 	Role          string     `gorm:"column:role_code"`
-	Context       string     `gorm:"column:session_context"`
-	TokenHash     string     `gorm:"column:session_token_hash"`
-	ExpiredDate   time.Time  `gorm:"column:session_expired_date"`
-	RevokedDate   *time.Time `gorm:"column:session_revoked_date"`
-	RevokedReason *string    `gorm:"column:session_revoked_reason"`
+	Context       string     `gorm:"column:users_context"`
+	TokenHash     string     `gorm:"column:users_token_hash"`
+	ExpiredDate   time.Time  `gorm:"column:users_expired_at"`
+	RevokedDate   *time.Time `gorm:"column:users_revoked_at"`
+	RevokedReason *string    `gorm:"column:users_revoked_reason"`
 	MemberActive  *bool      `gorm:"column:member_active"`
 }
 
@@ -37,9 +38,9 @@ type sessionRow struct {
 // (LEFT JOIN: keanggotaan yang sudah dihapus → member_active NULL → ditolak).
 func sessionQuery(db *gorm.DB, sessionID string) *gorm.DB {
 	return db.Table(UserSessionTable+" AS s").
-		Select("s.user_uuid, s.role_code, s.session_context, s.session_token_hash, s.session_expired_date, s.session_revoked_date, s.session_revoked_reason, r.urole_active AS member_active").
+		Select("s.user_uuid, s.role_code, s.users_context, s.users_token_hash, s.users_expired_at, s.users_revoked_at, s.users_revoked_reason, r.urole_active AS member_active").
 		Joins("LEFT JOIN "+UserRoleTable+" AS r ON r.user_uuid = s.user_uuid AND r.role_code = s.role_code").
-		Where("s.session_id = ?", sessionID).
+		Where("s.users_id = ?", sessionID).
 		Limit(1)
 }
 
