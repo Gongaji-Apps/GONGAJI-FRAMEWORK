@@ -165,6 +165,7 @@ Example response error:
 | **[docs/getting-started.md](docs/getting-started.md)** | Tutorial end-to-end membangun service dari nol |
 | **[docs/packages.md](docs/packages.md)** | Referensi lengkap setiap package: types, functions, examples, gotchas |
 | **[docs/recipes.md](docs/recipes.md)** | Resep-resep umum: cron job, kirim WhatsApp, cache hit, dll. |
+| **[docs/pedoman-api.md](docs/pedoman-api.md)** | Pedoman rute, respons, parameter & body untuk endpoint/DTO baru |
 | **[CHANGELOG.md](CHANGELOG.md)** | Riwayat versi dan breaking changes |
 
 ---
